@@ -130,7 +130,7 @@ FEATURES = {
     'ENABLE_CONTENT_LIBRARIES': False,
 
     # Enable the courseware search functionality
-    'ENABLE_COURSEWARE_INDEX': False,
+    'ENABLE_COURSEWARE_INDEX': True,
 
 }
 ENABLE_JASMINE = False
