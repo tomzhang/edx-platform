@@ -311,6 +311,8 @@ def _section_student_admin(course, access):
         'list_instructor_tasks_url': reverse('list_instructor_tasks', kwargs={'course_id': unicode(course_key)}),
         'list_entrace_exam_instructor_tasks_url': reverse('list_entrance_exam_instructor_tasks',
                                                           kwargs={'course_id': unicode(course_key)}),
+        'student_can_skip_entrance_exam_url': reverse('mark_student_can_skip_entrance_exam',
+                                                      kwargs={'course_id': unicode(course_key)}),
         'spoc_gradebook_url': reverse('spoc_gradebook', kwargs={'course_id': unicode(course_key)}),
     }
     return section_data

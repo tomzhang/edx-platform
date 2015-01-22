@@ -2323,6 +2323,19 @@ class TestEntranceExamInstructorAPIRegradeTask(ModuleStoreTestCase, LoginEnrollm
         )
         self.ee_modules = [ee_module_to_reset1.module_state_key, ee_module_to_reset2.module_state_key]
 
+    def test_skip_entrance_exam(self):
+        """ Test student is marked to skip entrance exam . """
+        url = reverse('mark_student_can_skip_entrance_exam', kwargs={'course_id': unicode(self.course.id)})
+        response = self.client.get(url, {
+            'unique_student_identifier': self.student.email,
+        })
+        self.assertEqual(response.status_code, 200)
+        # Trying to skip again for an already skipped student should have same effect
+        response = self.client.get(url, {
+            'unique_student_identifier': self.student.email,
+        })
+        self.assertEqual(response.status_code, 200)
+
     def test_reset_entrance_exam_student_attempts_deletall(self):
         """ Make sure no one can delete all students state on entrance exam. """
         url = reverse('reset_student_attempts_for_entrance_exam',
