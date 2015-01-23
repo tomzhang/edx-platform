@@ -9,7 +9,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from course_api.v0 import views
 
 
-CONTENT_ID_PATTERN = r'(?P<content_id>[\.a-zA-Z0-9_+\/:-]+)'
+CONTENT_ID_PATTERN = settings.USAGE_ID_PATTERN.replace('usage_id', 'content_id')
 COURSE_ID_PATTERN = settings.COURSE_ID_PATTERN
 
 # pylint: disable=invalid-name

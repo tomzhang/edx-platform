@@ -3,11 +3,13 @@
 import logging
 
 from django.http import Http404
+from opaque_keys.edx.locator import BlockUsageLocator
 from rest_framework.exceptions import ParseError
 from rest_framework.generics import RetrieveAPIView, ListAPIView
 from xmodule.modulestore.django import modulestore
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.lib.api.views import PaginatedListAPIViewWithKeyHeaderPermissions, ApiKeyHeaderPermissionMixin
+
 from course_api.courseware_access import get_course, get_course_child, get_course_descriptor
 from course_api.v0 import serializers
 
@@ -283,25 +285,50 @@ class CourseGradedContent(CourseContentMixin, ApiKeyHeaderPermissionMixin, ListA
 
     serializer_class = serializers.GradedContentSerializer
     allow_empty = False
+    course_key = None
 
-    def _filter_children(self, node, **kwargs):
+    def _preserialize_block(self, block):
+        """
+        Moves/renames certain fields to help avoid the need to make multiple serializer methods.
+        """
+        promoted_fields = ['format', 'display_name']
+        for field in promoted_fields:
+            block[field] = block['fields'].get(field)
+
+        block['category'] = block['block_type']
+
+
+    def _filter_children(self, structure, node, **kwargs):
         """ Retrieve the problems from the node/tree. """
 
+        fields = node['fields']
         matched = True
+
         for name, value in kwargs.iteritems():
-            matched &= (getattr(node, name, None) == value)
+
+            matched &= (node.get(name, None) == value)
             if not matched:
                 break
 
         if matched:
             return [node]
 
-        if not node.has_children:
+        children = fields.get('children', [])
+        if not len(children):
             return []
 
+        # Update the node's children with actual nodes instead of BlockKeys
+        for index, key in enumerate(children):
+            block = structure['blocks'][key]
+            block['location'] = self.get_block_usage_locator(key)
+            self._preserialize_block(block)
+            children[index] = block
+
+        node['fields']['children'] = children
+
         problems = []
-        for child in node.get_children():
-            problems += self._filter_children(child, **kwargs)
+        for child in children:
+            problems += self._filter_children(structure, child, **kwargs)
 
         return problems
 
@@ -309,22 +336,41 @@ class CourseGradedContent(CourseContentMixin, ApiKeyHeaderPermissionMixin, ListA
         # Load the entire content tree since we will need to filter down to the leaf nodes.
         return None
 
-    def get_queryset(self):
-        course_id = self.kwargs.get('course_id')
-        course_descriptor = self.get_course_or_404(self.request, course_id)
-        course_key = course_descriptor.id
-        _modulestore = modulestore()
+    def get_block_usage_locator(self, block_key):
+        return BlockUsageLocator(self.course_key, block_key.type, block_key.id)
 
-        items = _modulestore.get_items(course_key, settings={'graded': True}, depth=None)
+    def get_queryset(self):
         category = self.request.QUERY_PARAMS.get('filter_children_category')
 
         if not category:
             raise ParseError('The parameter filter_children_category must be supplied.')
 
-        for item in items:
-            item.children = self._filter_children(item, category=category)
+        course_id = self.kwargs.get('course_id')
+        course_key = CourseKey.from_string(course_id)
+        self.course_key = course_key
+        _modulestore = modulestore().modulestores[2]
 
-        return items
+        course_index = _modulestore.get_course_index(course_key)
+
+        # If course_index is None, the course doesn't exist.
+        if not course_index:
+            raise Http404
+
+        version = course_index['versions']['published-branch']
+        structure = _modulestore.get_structure(course_key, version)
+        blocks = structure['blocks']
+        graded = []
+        for key, block in blocks.iteritems():
+            if block['fields'].get('graded', False):
+                block['location'] = self.get_block_usage_locator(key)
+                graded.append(block)
+
+        for block in graded:
+            children = self._filter_children(structure, block, block_type=category)
+            block['children'] = children
+            self._preserialize_block(block)
+
+        return graded
 
 
 class CourseGradingPolicy(ApiKeyHeaderPermissionMixin, ListAPIView):

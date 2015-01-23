@@ -12,7 +12,16 @@ class ContentWithChildrenSerializer(serializers.Serializer):
 
     def get_children(self, content):
         """ Retrieve the children for the content, or set the attribute to an empty list. """
-        children = getattr(content, 'children', None)
+        key = 'children'
+        children = getattr(content, key, None)
+
+        try:
+            if not children and key in content:
+                children = content[key]
+        except TypeError:
+            # The content item may not be iterable.
+            pass
+
         if not children:
             return []
 
@@ -30,7 +39,12 @@ class CourseContentSerializer(ContentWithChildrenSerializer):
     def get_uri(self, content):
         """ Retrieve the URL for the content being serialized. """
         request = self.context['request']
-        content_id = unicode(content.location)
+        location = getattr(content, 'location', None)
+
+        if not location:
+            location = content['location']
+
+        content_id = unicode(location)
         course_id = self.context['course_id']
         return request.build_absolute_uri(reverse('course_api_v0:content:detail', kwargs={
             'course_id': unicode(course_id), 'content_id': content_id}))
