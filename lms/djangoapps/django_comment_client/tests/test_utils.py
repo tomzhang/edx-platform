@@ -9,13 +9,13 @@ from django.test.utils import override_settings
 from edxmako import add_lookup
 import mock
 
-from xmodule.modulestore.tests.django_utils import TEST_DATA_MOCK_MODULESTORE
 from django_comment_client.tests.factories import RoleFactory
 from django_comment_client.tests.unicode import UnicodeTestMixin
+from django_comment_client.tests.utils import ContentGroupTestCase
 import django_comment_client.utils as utils
 from student.tests.factories import UserFactory, CourseEnrollmentFactory
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, TEST_DATA_MOCK_MODULESTORE
 
 
 class DictionaryTestCase(TestCase):
@@ -90,6 +90,8 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
     comment client service integration
     """
     def setUp(self):
+        super(CoursewareContextTestCase, self).setUp(create_user=True)
+
         self.course = CourseFactory.create(org="TestX", number="101", display_name="Test Course")
         self.discussion1 = ItemFactory.create(
             parent_location=self.course.location,
@@ -107,12 +109,12 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
         )
 
     def test_empty(self):
-        utils.add_courseware_context([], self.course)
+        utils.add_courseware_context([], self.course, self.user)
 
     def test_missing_commentable_id(self):
         orig = {"commentable_id": "non-inline"}
         modified = dict(orig)
-        utils.add_courseware_context([modified], self.course)
+        utils.add_courseware_context([modified], self.course, self.user)
         self.assertEqual(modified, orig)
 
     def test_basic(self):
@@ -120,7 +122,7 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
             {"commentable_id": self.discussion1.discussion_id},
             {"commentable_id": self.discussion2.discussion_id}
         ]
-        utils.add_courseware_context(threads, self.course)
+        utils.add_courseware_context(threads, self.course, self.user)
 
         def assertThreadCorrect(thread, discussion, expected_title):  # pylint: disable=invalid-name
             """Asserts that the given thread has the expected set of properties"""
@@ -144,13 +146,31 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
         assertThreadCorrect(threads[1], self.discussion2, "Subsection / Discussion 2")
 
 
+class CategoryMapTestMixin(object):
+    """
+    Provides functionality for classes that test
+    `get_discussion_category_map`.
+    """
+    def assert_category_map_equals(self, expected, requesting_user=None):
+        """
+        Call `get_discussion_category_map`, and verify that it returns
+        what is expected.
+        """
+        self.assertEqual(
+            utils.get_discussion_category_map(self.course, requesting_user or self.user),
+            expected
+        )
+
+
 @override_settings(MODULESTORE=TEST_DATA_MOCK_MODULESTORE)
-class CategoryMapTestCase(ModuleStoreTestCase):
+class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
     """
     Base testcase class for discussion categories for the
     comment client service integration
     """
     def setUp(self):
+        super(CategoryMapTestCase, self).setUp(create_user=True)
+
         self.course = CourseFactory.create(
             org="TestX", number="101", display_name="Test Course",
             # This test needs to use a course that has already started --
@@ -175,17 +195,8 @@ class CategoryMapTestCase(ModuleStoreTestCase):
             **kwargs
         )
 
-    def assertCategoryMapEquals(self, expected):
-        self.assertEqual(
-            utils.get_discussion_category_map(self.course),
-            expected
-        )
-
     def test_empty(self):
-        self.assertEqual(
-            utils.get_discussion_category_map(self.course),
-            {"entries": {}, "subcategories": {}, "children": []}
-        )
+        self.assert_category_map_equals({"entries": {}, "subcategories": {}, "children": []})
 
     def test_configured_topics(self):
         self.course.discussion_topics = {
@@ -195,7 +206,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
         }
 
         def check_cohorted_topics(expected_ids):
-            self.assertCategoryMapEquals(
+            self.assert_category_map_equals(
                 {
                     "entries": {
                         "Topic A": {"id": "Topic_A", "sort_key": "Topic A", "is_cohorted": "Topic_A" in expected_ids},
@@ -227,7 +238,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
 
     def test_single_inline(self):
         self.create_discussion("Chapter", "Discussion")
-        self.assertCategoryMapEquals(
+        self.assert_category_map_equals(
             {
                 "entries": {},
                 "subcategories": {
@@ -257,7 +268,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
 
         def check_cohorted(is_cohorted):
 
-            self.assertCategoryMapEquals(
+            self.assert_category_map_equals(
                 {
                     "entries": {},
                     "subcategories": {
@@ -360,7 +371,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
         self.create_discussion("Chapter 2 / Section 1 / Subsection 2", "Discussion", start=later)
         self.create_discussion("Chapter 3 / Section 1", "Discussion", start=later)
 
-        self.assertCategoryMapEquals(
+        self.assert_category_map_equals(
             {
                 "entries": {},
                 "subcategories": {
@@ -398,7 +409,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
         self.create_discussion("Chapter", "Discussion 4", sort_key="C")
         self.create_discussion("Chapter", "Discussion 5", sort_key="B")
 
-        self.assertCategoryMapEquals(
+        self.assert_category_map_equals(
             {
                 "entries": {},
                 "subcategories": {
@@ -450,7 +461,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
             "Topic B": {"id": "Topic_B", "sort_key": "C"},
             "Topic C": {"id": "Topic_C", "sort_key": "A"}
         }
-        self.assertCategoryMapEquals(
+        self.assert_category_map_equals(
             {
                 "entries": {
                     "Topic A": {"id": "Topic_A", "sort_key": "B", "is_cohorted": False},
@@ -471,7 +482,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
         self.create_discussion("Chapter", "Discussion C")
         self.create_discussion("Chapter", "Discussion B")
 
-        self.assertCategoryMapEquals(
+        self.assert_category_map_equals(
             {
                 "entries": {},
                 "subcategories": {
@@ -524,7 +535,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
         self.create_discussion("Chapter B", "Discussion 1")
         self.create_discussion("Chapter A", "Discussion 2")
 
-        self.assertCategoryMapEquals(
+        self.assert_category_map_equals(
             {
                 "entries": {},
                 "subcategories": {
@@ -577,7 +588,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
         )
 
     def test_ids_empty(self):
-        self.assertEqual(utils.get_discussion_categories_ids(self.course), [])
+        self.assertEqual(utils.get_discussion_categories_ids(self.course, self.user), [])
 
     def test_ids_configured_topics(self):
         self.course.discussion_topics = {
@@ -586,7 +597,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
             "Topic C": {"id": "Topic_C"}
         }
         self.assertItemsEqual(
-            utils.get_discussion_categories_ids(self.course),
+            utils.get_discussion_categories_ids(self.course, self.user),
             ["Topic_A", "Topic_B", "Topic_C"]
         )
 
@@ -598,7 +609,7 @@ class CategoryMapTestCase(ModuleStoreTestCase):
         self.create_discussion("Chapter 2 / Section 1 / Subsection 2", "Discussion")
         self.create_discussion("Chapter 3 / Section 1", "Discussion")
         self.assertItemsEqual(
-            utils.get_discussion_categories_ids(self.course),
+            utils.get_discussion_categories_ids(self.course, self.user),
             ["discussion1", "discussion2", "discussion3", "discussion4", "discussion5", "discussion6"]
         )
 
@@ -612,8 +623,47 @@ class CategoryMapTestCase(ModuleStoreTestCase):
         self.create_discussion("Chapter 2", "Discussion")
         self.create_discussion("Chapter 2 / Section 1 / Subsection 1", "Discussion")
         self.assertItemsEqual(
-            utils.get_discussion_categories_ids(self.course),
+            utils.get_discussion_categories_ids(self.course, self.user),
             ["Topic_A", "Topic_B", "Topic_C", "discussion1", "discussion2", "discussion3"]
+        )
+
+
+class ContentGroupCategoryMapTestCase(CategoryMapTestMixin, ContentGroupTestCase):
+    """
+    Tests `get_discussion_category_map` on discussion modules which are
+    only visible to some content groups.
+    """
+    def test_alpha_and_staff_can_see(self):
+        for user_with_access in [self.alpha_user, self.staff_user]:
+            self.assert_category_map_equals(
+                {
+                    'subcategories': {
+                        u'Week 1': {
+                            'subcategories': {},
+                            'children': [u'Visible to Alpha'],
+                            'entries': {
+                                u'Visible to Alpha': {
+                                    'sort_key': None,
+                                    'is_cohorted': True,
+                                    'id': u'content_group_discussion'
+                                }
+                            }
+                        }
+                    },
+                    'children': [u'Week 1'],
+                    'entries': {}
+                },
+                requesting_user=user_with_access
+            )
+
+    def test_beta_cannot_see(self):
+        self.assert_category_map_equals(
+            {
+                'subcategories': {},
+                'children': [],
+                'entries': {}
+            },
+            requesting_user=self.beta_user
         )
 
 
