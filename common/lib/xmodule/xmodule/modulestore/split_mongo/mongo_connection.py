@@ -54,8 +54,8 @@ def structure_to_mongo(structure):
     check('BlockKey', structure['root'])
     check('dict(BlockKey: BlockData)', structure['blocks'])
     for block in structure['blocks'].itervalues():
-        if 'children' in block['fields']:
-            check('list(BlockKey)', block['fields']['children'])
+        if 'children' in block.fields:
+            check('list(BlockKey)', block.fields['children'])
 
     new_structure = dict(structure)
     new_structure['blocks'] = []

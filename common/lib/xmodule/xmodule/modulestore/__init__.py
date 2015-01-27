@@ -616,19 +616,20 @@ class ModuleStoreRead(ModuleStoreAssetBase):
         pass
 
     def _block_matches(self, fields_or_xblock, qualifiers):
-        '''
+        """
         Return True or False depending on whether the field value (block contents)
-        matches the qualifiers as per get_items. Note, only finds directly set not
-        inherited nor default value matches.
-        For substring matching pass a regex object.
-        for arbitrary function comparison such as date time comparison, pass
-        the function as in start=lambda x: x < datetime.datetime(2014, 1, 1, 0, tzinfo=pytz.UTC)
+        matches the qualifiers as per get_items.
+        NOTE: Method only finds directly set value matches - not inherited nor default value matches.
+        For substring matching:
+            pass a regex object.
+        For arbitrary function comparison such as date time comparison:
+            pass the function as in start=lambda x: x < datetime.datetime(2014, 1, 1, 0, tzinfo=pytz.UTC)
 
         Args:
             fields_or_xblock (dict or XBlock): either the json blob (from the db or get_explicitly_set_fields)
                 or the xblock.fields() value or the XBlock from which to get those values
              qualifiers (dict): field: searchvalue pairs.
-        '''
+        """
         if isinstance(fields_or_xblock, XBlock):
             fields = fields_or_xblock.fields
             xblock = fields_or_xblock
@@ -660,7 +661,7 @@ class ModuleStoreRead(ModuleStoreAssetBase):
         return True
 
     def _value_matches(self, target, criteria):
-        '''
+        """
         helper for _block_matches: does the target (field value) match the criteria?
 
         If target is a list, do any of the list elements meet the criteria
@@ -668,7 +669,7 @@ class ModuleStoreRead(ModuleStoreAssetBase):
         If the criteria is a function, does invoking it on the target yield something truthy?
         If criteria is a dict {($nin|$in): []}, then do (none|any) of the list elements meet the criteria
         Otherwise, is the target == criteria
-        '''
+        """
         if isinstance(target, list):
             return any(self._value_matches(ele, criteria) for ele in target)
         elif isinstance(criteria, re._pattern_type):  # pylint: disable=protected-access
