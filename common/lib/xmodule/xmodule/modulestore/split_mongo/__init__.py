@@ -72,6 +72,17 @@ class EditInfo(object):
         self.edited_on = edit_info.get('edited_on', None)
         self.edited_by = edit_info.get('edited_by', None)
 
+    def __str__(self):
+        return ("EditInfo(previous_version={self.previous_version}, "
+                        "update_version={self.update_version}, "
+                        "source_version={self.source_version}, "
+                        "edited_on={self.edited_on}, "
+                        "edited_by={self.edited_by}, "
+                        "original_usage={self.original_usage}, "
+                        "original_usage_version={self.original_usage_version}, "
+                        "_subtree_edited_on={self._subtree_edited_on}, "
+                        "_subtree_edited_by={self._subtree_edited_by})").format(self=self)
+
 
 class BlockData(object):
     """
@@ -117,6 +128,14 @@ class BlockData(object):
         self.defaults = stored.get('defaults', {})
         self.edit_info = EditInfo(stored.get('edit_info', {}))
 
+    def __str__(self):
+        return ("BlockData(fields={self.fields}, "
+                         "block_type={self.block_type}, "
+                         "definition={self.definition}, "
+                         "definition_loaded={self.definition_loaded}, "
+                         "defaults={self.defaults}, "
+                         "edit_info={self.edit_info})").format(self=self)
+
     def __contains__(self, item):
         return item in self.__slots__
 
@@ -128,33 +147,3 @@ class BlockData(object):
             raise KeyError
         else:
             return getattr(self, key)
-
-    # def get(self, key, *args, **kwargs):
-    #     """
-    #     Dict-like 'get' method. Raises AttributeError if requesting non-existent attribute and no default.
-    #     """
-    #     if len(args) > 0:
-    #         return getattr(self, key, args[0])
-    #     elif 'default' in kwargs:
-    #         return getattr(self, key, kwargs['default'])
-    #     else:
-    #         return getattr(self, key)
-
-    # def __setitem__(self, key, value):
-    #     setattr(self, key, value)
-
-    # def __delitem__(self, key):
-    #     delattr(self, key)
-
-    # def __iter__(self):
-    #     return self.__dict__.iterkeys()
-
-    # def setdefault(self, key, default=None):
-    #     """
-    #     Dict-like 'setdefault'.
-    #     """
-    #     try:
-    #         return getattr(self, key)
-    #     except AttributeError:
-    #         setattr(self, key, default)
-    #         return default

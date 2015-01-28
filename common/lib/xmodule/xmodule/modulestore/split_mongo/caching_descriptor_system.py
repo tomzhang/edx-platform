@@ -326,7 +326,7 @@ class CachingDescriptorSystem(MakoDescriptorSystem, EditInfoRuntimeMixin):
         for child in block_data.fields.get('children', []):
             child_data = self.get_module_data(BlockKey(*child), course_key)
             if block_data.edit_info._subtree_edited_on is None:
-                self._compute_subtree_edited_internal(child, child_data, course_key)
+                self._compute_subtree_edited_internal(child_data, course_key)
             if child_data.edit_info._subtree_edited_on > max_date:
                 max_date = child_data.edit_info._subtree_edited_on
                 max_date_by = child_data.edit_info._subtree_edited_by

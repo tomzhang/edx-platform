@@ -1283,9 +1283,9 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         """
         blocks = self._lookup_course(usage_key.course_key).structure['blocks']
         block = blocks.get(BlockKey.from_usage_key(usage_key))
-        if block and 'original_usage' in block['edit_info']:
-            usage_key = BlockUsageLocator.from_string(block['edit_info']['original_usage'])
-            return usage_key, block['edit_info'].get('original_usage_version')
+        if block and block.edit_info.original_usage is not None:
+            usage_key = BlockUsageLocator.from_string(block.edit_info.original_usage)
+            return usage_key, block.edit_info.original_usage_version
         return None, None
 
     def create_definition_from_data(self, course_key, new_def_data, category, user_id):
