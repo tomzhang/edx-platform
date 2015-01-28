@@ -3,6 +3,7 @@ Serializer for video outline
 """
 from rest_framework.reverse import reverse
 
+from xmodule.modulestore.mongo.base import BLOCK_TYPES_WITH_CHILDREN
 from courseware.access import has_access
 
 from edxval.api import (
@@ -159,8 +160,14 @@ class BlockOutline(object):
                     "summary": summary_fn(self.course_id, curr_block, self.request, self.local_cache)
                 }
 
+            def location_filter(location):
+                return (
+                    location.category in self.categories_to_outliner or
+                    location.category in BLOCK_TYPES_WITH_CHILDREN
+                )
+
             if curr_block.has_children:
-                for block in reversed(curr_block.get_children()):
+                for block in reversed(curr_block.get_children(location_filter)):
                     stack.append(block)
                     child_to_parent[block] = curr_block
 
