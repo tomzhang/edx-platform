@@ -1036,7 +1036,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             ):
                 if content:
                     definition_block = self.get_definition(course_locator, block_data.definition)
-                    return self._block_matches(definition_block.fields, content)
+                    return self._block_matches(definition_block['fields'], content)
                 else:
                     return True
 
