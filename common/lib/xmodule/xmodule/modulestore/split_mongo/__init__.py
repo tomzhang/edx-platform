@@ -28,11 +28,23 @@ class EditInfo(object):
     Encapsulates the editing info of a block.
     """
     __slots__ = (
+        # Guid for the structure which previously changed this XBlock.
+        # (Will be the previous value of 'update_version'.)
         'previous_version',
+
+        # Guid for the structure where this XBlock got its current field values.
+        # May point to a structure not in this structure's history (e.g., to a draft
+        # branch from which this version was published).
         'update_version',
+
         'source_version',
+
+        # Datetime when this XBlock's fields last changed.
         'edited_on',
+
+        # User ID which changed this XBlock last.
         'edited_by',
+
         'original_usage',
         'original_usage_version',
         '_subtree_edited_on',
@@ -42,13 +54,9 @@ class EditInfo(object):
     def __init__(self, edit_info={}):  # pylint: disable=dangerous-default-value
         self.from_storable(edit_info)
 
-        # Used by Split.
-        self.original_usage = None
-        self.original_usage_version = None
-
         # For details, see caching_descriptor_system.py get_subtree_edited_by/on.
-        self._subtree_edited_on = None
-        self._subtree_edited_by = None
+        self._subtree_edited_on = edit_info.get('_subtree_edited_on', None)
+        self._subtree_edited_by = edit_info.get('_subtree_edited_by', None)
 
     def to_storable(self):
         """
@@ -60,6 +68,8 @@ class EditInfo(object):
             'source_version': self.source_version,
             'edited_on': self.edited_on,
             'edited_by': self.edited_by,
+            'original_usage': self.original_usage,
+            'original_usage_version': self.original_usage_version,
         }
 
     def from_storable(self, edit_info):
@@ -71,17 +81,19 @@ class EditInfo(object):
         self.source_version = edit_info.get('source_version', None)
         self.edited_on = edit_info.get('edited_on', None)
         self.edited_by = edit_info.get('edited_by', None)
+        self.original_usage = edit_info.get('original_usage', None)
+        self.original_usage_version = edit_info.get('original_usage_version', None)
 
     def __str__(self):
-        return ("EditInfo(previous_version={self.previous_version}, "
-                        "update_version={self.update_version}, "
-                        "source_version={self.source_version}, "
-                        "edited_on={self.edited_on}, "
-                        "edited_by={self.edited_by}, "
-                        "original_usage={self.original_usage}, "
-                        "original_usage_version={self.original_usage_version}, "
-                        "_subtree_edited_on={self._subtree_edited_on}, "
-                        "_subtree_edited_by={self._subtree_edited_by})").format(self=self)
+        return ("EditInfo(previous_version={0.previous_version}, "
+                "update_version={0.update_version}, "
+                "source_version={0.source_version}, "
+                "edited_on={0.edited_on}, "
+                "edited_by={0.edited_by}, "
+                "original_usage={0.original_usage}, "
+                "original_usage_version={0.original_usage_version}, "
+                "_subtree_edited_on={0._subtree_edited_on}, "
+                "_subtree_edited_by={0._subtree_edited_by})").format(self)
 
 
 class BlockData(object):
@@ -91,11 +103,24 @@ class BlockData(object):
     the structure itself.
     """
     __slots__ = (
+        # Contains the Scope.settings and 'children' field values.
+        # 'children' are stored as a list of (block_type, block_id) pairs.
         'fields',
+
+        # XBlock type ID.
         'block_type',
+
+        # DB id of the record containing the content of this XBlock.
         'definition',
+
+        # Scope.settings default values copied from a template block (used e.g. when
+        # blocks are copied from a library to a course)
         'defaults',
+
+        # EditInfo object.
         'edit_info',
+
+        # True if definition has been loaded, else False. (Not serialized.)
         'definition_loaded'
     )
 
@@ -129,12 +154,12 @@ class BlockData(object):
         self.edit_info = EditInfo(stored.get('edit_info', {}))
 
     def __str__(self):
-        return ("BlockData(fields={self.fields}, "
-                         "block_type={self.block_type}, "
-                         "definition={self.definition}, "
-                         "definition_loaded={self.definition_loaded}, "
-                         "defaults={self.defaults}, "
-                         "edit_info={self.edit_info})").format(self=self)
+        return ("BlockData(fields={0.fields}, "
+                "block_type={0.block_type}, "
+                "definition={0.definition}, "
+                "definition_loaded={0.definition_loaded}, "
+                "defaults={0.defaults}, "
+                "edit_info={0.edit_info})").format(self)
 
     def __contains__(self, item):
         return item in self.__slots__

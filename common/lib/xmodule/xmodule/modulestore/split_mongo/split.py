@@ -22,14 +22,15 @@ Representation:
     ** 'edited_by': user_id of the user whose change caused the creation of this structure version,
     ** 'edited_on': the datetime for the change causing this creation of this structure version,
     ** 'blocks': dictionary of xblocks in this structure:
-        *** BlockKey: dictionary of block settings and children:
+        *** BlockKey: key mapping to each BlockData:
+        *** BlockData: object containing the following attributes:
             **** 'block_type': the xblock type id
             **** 'definition': the db id of the record containing the content payload for this xblock
             **** 'fields': the Scope.settings and children field values
                 ***** 'children': This is stored as a list of (block_type, block_id) pairs
             **** 'defaults': Scope.settings default values copied from a template block (used e.g. when
                 blocks are copied from a library to a course)
-            **** 'edit_info': dictionary:
+            **** 'edit_info': EditInfo object:
                 ***** 'edited_on': when was this xblock's fields last changed (will be edited_on value of
                 update_version structure)
                 ***** 'edited_by': user_id for who changed this xblock last (will be edited_by value of
