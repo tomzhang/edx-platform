@@ -1236,18 +1236,18 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         result = {}
         for version in all_versions_with_block:
             block_payload = self._get_block_from_structure(version, block_key)
-            if version['_id'] == block_payload['edit_info']['update_version']:
-                if block_payload['edit_info'].get('previous_version') is None:
+            if version['_id'] == block_payload.edit_info.update_version:
+                if block_payload.edit_info.previous_version is None:
                     # this was when this block was created
-                    possible_roots.append(block_payload['edit_info']['update_version'])
+                    possible_roots.append(block_payload.edit_info.update_version)
                 else:  # map previous to {update..}
-                    result.setdefault(block_payload['edit_info']['previous_version'], set()).add(
-                        block_payload['edit_info']['update_version'])
+                    result.setdefault(block_payload.edit_info.previous_version, set()).add(
+                        block_payload.edit_info.update_version)
 
         # more than one possible_root means usage was added and deleted > 1x.
         if len(possible_roots) > 1:
             # find the history segment including block_locator's version
-            element_to_find = self._get_block_from_structure(course_struct, block_key)['edit_info']['update_version']
+            element_to_find = self._get_block_from_structure(course_struct, block_key).edit_info.update_version
             if element_to_find in possible_roots:
                 possible_roots = [element_to_find]
             for possibility in possible_roots:
