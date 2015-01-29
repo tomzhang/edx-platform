@@ -185,6 +185,20 @@ class InheritanceMixin(XBlockMixin):
         default=False
     )
 
+    display_name = String(
+        display_name=_("Display name for this module"),
+        help=_("Enter the display name for this module."),
+        scope=Scope.settings,
+        default='',
+    )
+
+    format = String(
+        display_name=_("Format for this module"),
+        help=_("Enter the format for this module."),
+        scope=Scope.settings,
+        default='',
+    )
+
 
 def compute_inherited_metadata(descriptor):
     """Given a descriptor, traverse all of its descendants and do metadata

@@ -6,21 +6,24 @@ returns the i4x://org/course/cat/name@draft object if that exists,
 and otherwise returns i4x://org/course/cat/name).
 """
 
-import pymongo
 import logging
 
+import pymongo
 from opaque_keys.edx.locations import Location
+from opaque_keys.edx.locator import BlockUsageLocator
 from xmodule.exceptions import InvalidVersionError
 from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.draft_and_published import UnsupportedRevisionError, DIRECT_ONLY_CATEGORIES
 from xmodule.modulestore.courseware_index import CoursewareSearchIndexer
 from xmodule.modulestore.exceptions import (
     ItemNotFoundError, DuplicateItemError, DuplicateCourseError, InvalidBranchSetting
 )
+from xmodule.modulestore.models import Block, CourseStructure
 from xmodule.modulestore.mongo.base import (
     MongoModuleStore, MongoRevisionKey, as_draft, as_published, SORT_REVISION_FAVOR_DRAFT
 )
 from xmodule.modulestore.store_utilities import rewrite_nonportable_content_links
-from xmodule.modulestore.draft_and_published import UnsupportedRevisionError, DIRECT_ONLY_CATEGORIES
+
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +50,7 @@ class DraftModuleStore(MongoModuleStore):
     This module also includes functionality to promote DRAFT modules (and their children)
     to published modules.
     """
+
     def get_item(self, usage_key, depth=0, revision=None, **kwargs):
         """
         Returns an XModuleDescriptor instance for the item at usage_key.
@@ -77,6 +81,7 @@ class DraftModuleStore(MongoModuleStore):
             xmodule.modulestore.exceptions.ItemNotFoundError if no object
             is found at that usage_key
         """
+
         def get_published():
             return wrap_draft(super(DraftModuleStore, self).get_item(usage_key, depth=depth))
 
@@ -123,6 +128,7 @@ class DraftModuleStore(MongoModuleStore):
                     if branch setting is ModuleStoreEnum.Branch.published_only, checks for the published item only
                     if branch setting is ModuleStoreEnum.Branch.draft_preferred, checks whether draft or published item exists
         """
+
         def has_published():
             return super(DraftModuleStore, self).has_item(usage_key)
 
@@ -333,6 +339,7 @@ class DraftModuleStore(MongoModuleStore):
                     if the branch setting is ModuleStoreEnum.Branch.draft_preferred,
                         returns either Draft or Published, preferring Draft items.
         """
+
         def base_get_items(key_revision):
             return super(DraftModuleStore, self).get_items(course_key, key_revision=key_revision, **kwargs)
 
@@ -839,6 +846,41 @@ class DraftModuleStore(MongoModuleStore):
                 expected_setting=expected_branch_setting,
                 actual_setting=actual_branch_setting
             )
+
+    def _block_locators_to_unicode(self, locators):
+        return [unicode(locator) for locator in locators]
+
+    def _format_course_structure(self, course_key, structure):
+        course_locator = BlockUsageLocator(course_key, 'course', course_key.run)
+        course_locator_string = unicode(course_locator)
+        course = self.get_course(course_key, depth=0)
+
+        blocks = {
+            course_locator_string: Block(course_locator_string,
+                                         course_locator.block_type,
+                                         display_name=course.display_name,
+                                         format=getattr(course, u'format', None),
+                                         graded=getattr(course, u'graded', False),
+                                         children=self._block_locators_to_unicode(getattr(course, u'children', [])))
+        }
+
+        for key, value in structure.iteritems():
+            block_locator = BlockUsageLocator.from_string(key)
+            # TODO Determine a way to properly retrieve display_name and format.
+            block = Block(key,
+                          block_locator.block_type,
+                          display_name=value.get(u'display_name', None),
+                          format=value.get(u'format', None),
+                          graded=value.get(u'graded', False),
+                          children=value.get(u'children', []))
+            blocks[key] = block
+
+        return CourseStructure(course_locator_string, blocks)
+
+    def get_course_structure(self, course_id, version=None):  # pylint: disable=unused-argument
+        structure = self._get_cached_metadata_inheritance_tree(course_id, force_refresh=True)
+        structure = self._format_course_structure(course_id, structure)
+        return structure
 
 
 def _verify_revision_is_published(location):

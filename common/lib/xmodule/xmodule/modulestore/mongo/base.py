@@ -633,16 +633,14 @@ class MongoModuleStore(ModuleStoreDraftAndPublished, ModuleStoreWriteBase, Mongo
             return ParentLocationCache()
 
     def _compute_metadata_inheritance_tree(self, course_id):
-        '''
+        """
         Find all inheritable fields from all xblocks in the course which may define inheritable data
-        '''
-        # get all collections in the course, this query should not return any leaf nodes
+        """
         course_id = self.fill_in_run(course_id)
         query = SON([
             ('_id.tag', 'i4x'),
             ('_id.org', course_id.org),
-            ('_id.course', course_id.course),
-            ('_id.category', {'$in': BLOCK_TYPES_WITH_CHILDREN})
+            ('_id.course', course_id.course)
         ])
         # if we're only dealing in the published branch, then only get published containers
         if self.get_branch_setting() == ModuleStoreEnum.Branch.published_only:
@@ -668,6 +666,11 @@ class MongoModuleStore(ModuleStoreDraftAndPublished, ModuleStoreWriteBase, Mongo
             # manually pick it apart b/c the db has tag and we want as_published revision regardless
             location = as_published(Location._from_deprecated_son(result['_id'], course_id.run))
 
+            # TODO This level of detail should not be here. It is necessary because the display name for video
+            # modules defaults to "Video" if one is not provided. We should find a better method of setting this value.
+            if result['_id']['category'] == 'video' and not result['metadata'].get('display_name'):
+                result['metadata']['display_name'] = 'Video'
+
             location_url = unicode(location)
             if location_url in results_by_url:
                 # found either draft or live to complement the other revision
@@ -690,20 +693,27 @@ class MongoModuleStore(ModuleStoreDraftAndPublished, ModuleStoreWriteBase, Mongo
             """
             Helper method for computing inherited metadata for a specific location url
             """
-            my_metadata = results_by_url[url].get('metadata', {})
+            result = results_by_url[url]
+            my_metadata = result.get('metadata', {})
+            children = result.get('definition', {}).get('children', [])
+            my_metadata['children'] = children
 
             # go through all the children and recurse, but only if we have
             # in the result set. Remember results will not contain leaf nodes
-            for child in results_by_url[url].get('definition', {}).get('children', []):
-                if child in results_by_url:
-                    new_child_metadata = copy.deepcopy(my_metadata)
-                    new_child_metadata.update(results_by_url[child].get('metadata', {}))
-                    results_by_url[child]['metadata'] = new_child_metadata
+
+            for child in children:
+                new_child_metadata = copy.deepcopy(my_metadata)
+                new_child_metadata.pop('children')
+                child_result = results_by_url.get(child)
+
+                if child_result:
+                    new_child_metadata.update(child_result.get('metadata', {}))
+                    child_result['metadata'] = new_child_metadata
                     metadata_to_inherit[child] = new_child_metadata
                     _compute_inherited_metadata(child)
                 else:
                     # this is likely a leaf node, so let's record what metadata we need to inherit
-                    metadata_to_inherit[child] = my_metadata.copy()
+                    metadata_to_inherit[child] = new_child_metadata
                 # WARNING: 'parent' is not part of inherited metadata, but
                 # we're piggybacking on this recursive traversal to grab
                 # and cache the child's parent, as a performance optimization.
@@ -717,9 +727,9 @@ class MongoModuleStore(ModuleStoreDraftAndPublished, ModuleStoreWriteBase, Mongo
         return metadata_to_inherit
 
     def _get_cached_metadata_inheritance_tree(self, course_id, force_refresh=False):
-        '''
+        """
         Compute the metadata inheritance for the course.
-        '''
+        """
         tree = {}
 
         course_id = self.fill_in_run(course_id)
