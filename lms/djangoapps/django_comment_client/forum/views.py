@@ -75,17 +75,26 @@ def get_threads(request, course_key, discussion_id=None, per_page=THREADS_PER_PA
     This may raise an appropriate subclass of cc.utils.CommentClientError
     if something goes wrong, or ValueError if the group_id is invalid.
     """
+    course = get_course_with_access(request.user, 'load_forum', course_key)
+
     default_query_params = {
         'page': 1,
         'per_page': per_page,
         'sort_key': 'date',
         'sort_order': 'desc',
         'text': '',
-        'commentable_id': discussion_id,
         'course_id': course_key.to_deprecated_string(),
         'user_id': request.user.id,
         'group_id': get_group_id_for_comments_service(request, course_key, discussion_id),  # may raise ValueError
     }
+
+    if discussion_id is not None:
+        default_query_params['commentable_id'] = discussion_id
+    else:
+        default_query_params['commentable_ids'] = ','.join(
+            course.top_level_discussion_topic_ids +
+            utils.get_discussion_id_map(course, request.user).keys()
+        )
 
     if not request.GET.get('sort_key'):
         # If the user did not select a sort key, use their last used sort key
@@ -266,11 +275,11 @@ def single_thread(request, course_key, discussion_id, thread_id):
     user_info = cc_user.to_dict()
     is_moderator = cached_has_permission(request.user, "see_all_cohorts", course_key)
 
-    # Verify that student has access to this thread if belongs to a discussion module
-    if discussion_id not in course.top_level_discussion_topic_ids and \
-            discussion_id not in [
-                module.discussion_id for module in utils.get_accessible_discussion_modules(course, request.user)
-            ]:
+    # Verify that the student has access to this thread if belongs to a discussion module
+    accessible_discussion_module_ids = [
+        module.discussion_id for module in utils.get_accessible_discussion_modules(course, request.user)
+    ]
+    if discussion_id not in set(course.top_level_discussion_topic_ids + accessible_discussion_module_ids):
         raise Http404
 
     # Currently, the front end always loads responses via AJAX, even for this
