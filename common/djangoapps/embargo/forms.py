@@ -4,9 +4,6 @@ Defines forms for providing validation of embargo admin details.
 
 from django import forms
 
-from embargo.models import EmbargoedCourse, EmbargoedState, IPFilter
-from embargo.fixtures.country_codes import COUNTRY_CODES
-
 import ipaddr
 
 from xmodule.modulestore.django import modulestore
@@ -14,17 +11,46 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locations import SlashSeparatedCourseKey
 
+from embargo.models import (
+    EmbargoedCourse, EmbargoedState, IPFilter,
+    RestrictedCourse
+)
+from embargo.fixtures.country_codes import COUNTRY_CODES
 
-class EmbargoedCourseForm(forms.ModelForm):  # pylint: disable=incomplete-protocol
-    """Form providing validation of entered Course IDs."""
 
-    class Meta:  # pylint: disable=missing-docstring
-        model = EmbargoedCourse
+class CourseKeyValidationForm(forms.ModelForm):
+    """Base class for validating the "course_key" (or "course_id") field.
+
+    The default behavior in Django admin is to:
+    * Save course keys for courses that do not exist.
+    * Return a 500 response if the course key format is invalid.
+
+    Using this form ensures that we display a user-friendly
+    error message instead.
+
+    """
 
     def clean_course_id(self):
-        """Validate the course id"""
+        return self._clean_course_key("course_id")
 
-        cleaned_id = self.cleaned_data["course_id"]
+    def clean_course_key(self):
+        return self._clean_course_key("course_key")
+
+    def _clean_course_key(self, field_name):
+        """Validate the course key.
+
+        Checks that the key format is valid and that
+        the course exists.  If not, displays an error message.
+
+        Arguments:
+            field_name (str): The name of the field to validate.
+
+        Returns:
+            CourseKey
+
+        """
+        cleaned_id = self.cleaned_data[field_name]
+
         try:
             course_key = CourseKey.from_string(cleaned_id)
         except InvalidKeyError:
@@ -43,6 +69,20 @@ class EmbargoedCourseForm(forms.ModelForm):  # pylint: disable=incomplete-protoc
             raise forms.ValidationError(msg)
 
         return course_key
+
+
+class EmbargoedCourseForm(CourseKeyValidationForm):
+    """Validate course keys for the EmbargoedCourse model. """
+
+    class Meta:  # pylint: disable=missing-docstring
+        model = EmbargoedCourse
+
+
+class RestrictedCourseForm(CourseKeyValidationForm):
+    """Validate course keys for the RestirctedCourse model. """
+
+    class Meta:  # pylint: disable=missing-docstring
+        model = RestrictedCourse
 
 
 class EmbargoedStateForm(forms.ModelForm):  # pylint: disable=incomplete-protocol
