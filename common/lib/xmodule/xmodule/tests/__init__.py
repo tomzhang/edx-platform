@@ -260,13 +260,13 @@ class BulkAssertionTest(unittest.TestCase):
         if self._manager is not None:
             try:
                 super(BulkAssertionTest, self).assertEqual(expected, actual, message)
-            except Exception as e:
+            except Exception as error:  # pylint: disable=broad-except
                 exc_stack = inspect.stack()[1]
                 if message is not None:
-                    msg = '{} -> {}:{} -> {}'.format(message, exc_stack[1], exc_stack[2], unicode(e))
+                    msg = '{} -> {}:{} -> {}'.format(message, exc_stack[1], exc_stack[2], unicode(error))
                 else:
-                    msg = '{}:{} -> {}'.format(exc_stack[1], exc_stack[2], unicode(e))
-                self._manager._equal_assertions.append(msg)
+                    msg = '{}:{} -> {}'.format(exc_stack[1], exc_stack[2], unicode(error))
+                self._manager._equal_assertions.append(msg)  # pylint: disable=protected-access
         else:
             super(BulkAssertionTest, self).assertEqual(expected, actual, message)
     assertEquals = assertEqual
