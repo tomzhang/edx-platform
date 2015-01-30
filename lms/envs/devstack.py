@@ -108,6 +108,8 @@ PASSWORD_COMPLEXITY = {}
 ########################### Milestones #################################
 FEATURES['MILESTONES_APP'] = True
 
+########################### Notifications #################################
+FEATURES['NOTIFICATIONS_ENABLED'] = True
 
 ########################### Entrance Exams #################################
 FEATURES['ENTRANCE_EXAMS'] = True
