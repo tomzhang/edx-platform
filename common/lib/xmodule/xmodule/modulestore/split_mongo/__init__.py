@@ -27,30 +27,6 @@ class EditInfo(object):
     """
     Encapsulates the editing info of a block.
     """
-    __slots__ = (
-        # Guid for the structure which previously changed this XBlock.
-        # (Will be the previous value of 'update_version'.)
-        'previous_version',
-
-        # Guid for the structure where this XBlock got its current field values.
-        # May point to a structure not in this structure's history (e.g., to a draft
-        # branch from which this version was published).
-        'update_version',
-
-        'source_version',
-
-        # Datetime when this XBlock's fields last changed.
-        'edited_on',
-
-        # User ID which changed this XBlock last.
-        'edited_by',
-
-        'original_usage',
-        'original_usage_version',
-        '_subtree_edited_on',
-        '_subtree_edited_by',
-    )
-
     def __init__(self, edit_info={}):  # pylint: disable=dangerous-default-value
         self.from_storable(edit_info)
 
@@ -76,11 +52,22 @@ class EditInfo(object):
         """
         De-serialize from Mongo-storable format to an object.
         """
+        # Guid for the structure which previously changed this XBlock.
+        # (Will be the previous value of 'update_version'.)
         self.previous_version = edit_info.get('previous_version', None)
+
+        # Guid for the structure where this XBlock got its current field values.
+        # May point to a structure not in this structure's history (e.g., to a draft
+        # branch from which this version was published).
         self.update_version = edit_info.get('update_version', None)
+
         self.source_version = edit_info.get('source_version', None)
+
+        # Datetime when this XBlock's fields last changed.
         self.edited_on = edit_info.get('edited_on', None)
+        # User ID which changed this XBlock last.
         self.edited_by = edit_info.get('edited_by', None)
+
         self.original_usage = edit_info.get('original_usage', None)
         self.original_usage_version = edit_info.get('original_usage_version', None)
 
@@ -102,28 +89,6 @@ class BlockData(object):
     Allows the storing of meta-information about a structure that doesn't persist along with
     the structure itself.
     """
-    __slots__ = (
-        # Contains the Scope.settings and 'children' field values.
-        # 'children' are stored as a list of (block_type, block_id) pairs.
-        'fields',
-
-        # XBlock type ID.
-        'block_type',
-
-        # DB id of the record containing the content of this XBlock.
-        'definition',
-
-        # Scope.settings default values copied from a template block (used e.g. when
-        # blocks are copied from a library to a course)
-        'defaults',
-
-        # EditInfo object.
-        'edit_info',
-
-        # True if definition has been loaded, else False. (Not serialized.)
-        'definition_loaded'
-    )
-
     @contract(block_dict=dict)
     def __init__(self, block_dict={}):  # pylint: disable=dangerous-default-value
         # Has the definition been loaded?
@@ -147,10 +112,21 @@ class BlockData(object):
         """
         De-serialize from Mongo-storable format to an object.
         """
+        # Contains the Scope.settings and 'children' field values.
+        # 'children' are stored as a list of (block_type, block_id) pairs.
         self.fields = stored.get('fields', {})
+
+        # XBlock type ID.
         self.block_type = stored.get('block_type', None)
+
+        # DB id of the record containing the content of this XBlock.
         self.definition = stored.get('definition', None)
+
+        # Scope.settings default values copied from a template block (used e.g. when
+        # blocks are copied from a library to a course)
         self.defaults = stored.get('defaults', {})
+
+        # EditInfo object containing all versioning/editing data.
         self.edit_info = EditInfo(stored.get('edit_info', {}))
 
     def __str__(self):
@@ -162,7 +138,7 @@ class BlockData(object):
                 "edit_info={0.edit_info})").format(self)
 
     def __contains__(self, item):
-        return item in self.__slots__
+        return hasattr(self, item)
 
     def __getitem__(self, key):
         """
