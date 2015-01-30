@@ -126,8 +126,20 @@ END
         ;;
 
     "unit")
-        paver test
-        paver coverage
+        case "$SHARD" in        
+            "lms")
+                paver test_system -s lms --cov_args="-p"
+                ;;
+            "other")
+                paver test_system -s cms --cov_args="-p"
+                paver test_js
+                paver test_lib --cov_args="-p"
+                ;;
+            *)
+                paver test
+                paver coverage
+                ;;
+        esac
         ;;
 
     "lms-acceptance")
