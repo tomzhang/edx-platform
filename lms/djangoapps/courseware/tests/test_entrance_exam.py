@@ -13,6 +13,10 @@ from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, TEST_DATA_MOCK_MODULESTORE
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from util.milestones_helpers import generate_milestone_namespace, NAMESPACE_CHOICES
+from django.core.urlresolvers import reverse
+from student.models import CourseEnrollment
+from mock import patch
+import mock
 
 
 @override_settings(MODULESTORE=TEST_DATA_MOCK_MODULESTORE)
@@ -31,12 +35,12 @@ class EntranceExamTestCases(ModuleStoreTestCase):
                 'entrance_exam_enabled': True,
             }
         )
-        chapter = ItemFactory.create(
+        self.chapter = ItemFactory.create(
             parent=self.course,
             display_name='Overview'
         )
         ItemFactory.create(
-            parent=chapter,
+            parent=self.chapter,
             display_name='Welcome'
         )
         ItemFactory.create(
@@ -44,8 +48,8 @@ class EntranceExamTestCases(ModuleStoreTestCase):
             category='chapter',
             display_name="Week 1"
         )
-        ItemFactory.create(
-            parent=chapter,
+        self.chapter_subsection = ItemFactory.create(
+            parent=self.chapter,
             category='sequential',
             display_name="Lesson 1"
         )
@@ -58,7 +62,9 @@ class EntranceExamTestCases(ModuleStoreTestCase):
         self.entrance_exam = ItemFactory.create(
             parent=self.course,
             category="chapter",
-            display_name="Entrance Exam Section - Chapter 1"
+            display_name="Entrance Exam Section - Chapter 1",
+            is_entrance_exam=True,
+            in_entrance_exam=True
         )
         self.exam_1 = ItemFactory.create(
             parent=self.entrance_exam,
@@ -124,12 +130,54 @@ class EntranceExamTestCases(ModuleStoreTestCase):
             user,
             self.entrance_exam
         )
-        self.entrance_exam.is_entrance_exam = True
-        self.entrance_exam.in_entrance_exam = True
         self.course.entrance_exam_enabled = True
         self.course.entrance_exam_minimum_score_pct = 0.50
         self.course.entrance_exam_id = unicode(self.entrance_exam.scope_ids.usage_id)
         modulestore().update_item(self.course, user.id)  # pylint: disable=no-member
+
+        self.client.login(username=self.request.user.username, password="test")
+        CourseEnrollment.enroll(self.request.user, self.course.id)
+
+    @mock.patch('xmodule.x_module.XModuleMixin.has_dynamic_children', mock.Mock(return_value='True'))
+    def test_view_redirect_if_entrance_exam_required(self):
+        """
+        Unit Test: if entrance exam is required. Should return a redirect.
+        """
+        url = reverse('courseware', kwargs={'course_id': unicode(self.course.id)})
+        expected_url = reverse('courseware_section',
+                               kwargs={
+                                   'course_id': unicode(self.course.id),
+                                   'chapter': self.entrance_exam.location.name,
+                                   'section': self.exam_1.location.name
+                               })
+        resp = self.client.get(url)
+        self.assertRedirects(resp, expected_url, status_code=302, target_status_code=200)
+
+    @patch.dict('django.conf.settings.FEATURES', {'ENTRANCE_EXAMS': False})
+    def test_entrance_exam_content_absence(self):
+        """
+        Unit Test: If entrance exam is not enabled then its content e.g. problems should not be loaded.
+        """
+        url = reverse('courseware', kwargs={'course_id': unicode(self.course.id)})
+        resp = self.client.get(url)
+        self.assertNotIn('Exam Problem - Problem 1', resp.content)
+        self.assertNotIn('Exam Problem - Problem 2', resp.content)
+
+    def test_entrance_exam_requirement_message(self):
+        """
+        Unit Test: entrance exam requirement message should be present in response
+        """
+        url = reverse(
+            'courseware_section',
+            kwargs={
+                'course_id': unicode(self.course.id),
+                'chapter': self.entrance_exam.location.name,
+                'section': self.exam_1.location.name
+            }
+        )
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('In order to access the rest of the course, you need to attain', resp.content)
 
     def test_entrance_exam_gating(self):
         """

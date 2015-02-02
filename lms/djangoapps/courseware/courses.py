@@ -23,6 +23,10 @@ from courseware.model_data import FieldDataCache
 from courseware.module_render import get_module
 from student.models import CourseEnrollment
 import branding
+from util.milestones_helpers import get_required_content, calculate_entrance_exam_score
+from util.module_utils import yield_dynamic_descriptor_descendents
+from opaque_keys.edx.keys import UsageKey
+from .module_render import get_module_for_descriptor
 
 log = logging.getLogger(__name__)
 
@@ -415,3 +419,45 @@ def get_studio_url(course, page):
     if is_studio_course and is_mongo_course:
         studio_link = get_cms_course_link(course, page)
     return studio_link
+
+
+def get_entrance_exam_score(request, course):
+    """
+    Get entrance exam score
+    """
+    exam_key = UsageKey.from_string(course.entrance_exam_id)
+    exam_descriptor = modulestore().get_item(exam_key)
+
+    def inner_get_module(descriptor):
+        """
+        Delegate to get_module_for_descriptor.
+        """
+        field_data_cache = FieldDataCache([descriptor], course.id, request.user)
+        return get_module_for_descriptor(request.user, request, descriptor, field_data_cache, course.id)
+
+    exam_module_generators = yield_dynamic_descriptor_descendents(
+        exam_descriptor,
+        inner_get_module
+    )
+    exam_modules = [module for module in exam_module_generators]
+    return calculate_entrance_exam_score(request.user, course, exam_modules)
+
+
+def get_entrance_exam_content_info(request, course_module, course):
+    """
+    Get the entrance exam content information e.g. chapter, score.
+    If the course has a required entrance exam then return its chapter and its current score.
+    """
+    required_content = get_required_content(course, request.user)
+    exam_current_score = exam_chapter = None
+    if len(required_content):
+        for _chapter in course_module.get_display_items():
+            # Is the chapter is in required_content e.g. entrance exam.
+            if unicode(_chapter.location) in required_content and\
+                    not _chapter.hide_from_toc and\
+                    _chapter.is_entrance_exam:
+                exam_current_score = get_entrance_exam_score(request, course)
+                exam_chapter = _chapter
+                break
+
+    return exam_chapter, exam_current_score

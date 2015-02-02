@@ -32,7 +32,8 @@ from markupsafe import escape
 
 from courseware import grades
 from courseware.access import has_access, _adjust_start_date_for_beta_testers
-from courseware.courses import get_courses, get_course, get_studio_url, get_course_with_access, sort_by_announcement
+from courseware.courses import get_courses, get_course, get_studio_url, get_course_with_access, sort_by_announcement,\
+    get_entrance_exam_content_info
 from courseware.courses import sort_by_start_date
 from courseware.masquerade import setup_masquerade
 from courseware.model_data import FieldDataCache
@@ -407,6 +408,19 @@ def _index_bulk_op(request, course_key, chapter, section, position):
             # Show empty courseware for a course with no units
             return render_to_response('courseware/courseware.html', context)
         elif chapter is None:
+            # Check to see if the course is gated on required content (such as an Entrance Exam)
+            # before access the course then redirect the view with entrance exam content e.g. chapter and section.
+            if settings.FEATURES.get('ENTRANCE_EXAMS', False) and getattr(course, 'entrance_exam_enabled', False):
+                exam_chapter, _ = get_entrance_exam_content_info(request, course_module, course)
+                if exam_chapter is not None:
+                    exam_section = None
+                    if len(exam_chapter.get_display_items()):
+                        exam_section = exam_chapter.get_display_items()[0].url_name
+                    return redirect('courseware_section',
+                                    course_id=course_key.to_deprecated_string(),
+                                    chapter=exam_chapter.url_name,
+                                    section=exam_section)
+
             # passing CONTENT_DEPTH avoids returning 404 for a course with an
             # empty first section and a second section with content
             return redirect_to_course_position(course_module, CONTENT_DEPTH)
@@ -422,6 +436,11 @@ def _index_bulk_op(request, course_key, chapter, section, position):
                 show_chat = False
 
         context['show_chat'] = show_chat
+
+        if settings.FEATURES.get('ENTRANCE_EXAMS', False) and getattr(course, 'entrance_exam_enabled', False):
+            _, exam_current_score = get_entrance_exam_content_info(request, course_module, course)
+            if exam_current_score is not None:
+                context['entrance_exam_current_score'] = exam_current_score
 
         chapter_descriptor = course.get_child_by(lambda m: m.location.name == chapter)
         if chapter_descriptor is not None:
