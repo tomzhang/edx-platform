@@ -129,14 +129,13 @@ class RestrictedCourse(models.Model):
         """Return the name of the key to use to cache the current restricted course list"""
         return 'embargo/RestrictedCourse/courses'
 
-    @classmethod
-    def is_restricted_course(cls, course_id):
-        return course_id in cls._get_restricted_courses_from_cache()
+    def is_restricted_course(self, course_id):
+        return unicode(course_id) in self._get_restricted_courses_from_cache()
 
     def _get_restricted_courses_from_cache(self):
         countries = cache.get(self.cache_key_name())
         if not countries:
-            countries = RestrictedCourse.objects.values_list('course_key', flat=True)
+            countries = list(RestrictedCourse.objects.values_list('course_key', flat=True))
             cache.set(self.cache_key_name(), countries)
         return countries
 
@@ -243,13 +242,14 @@ class CountryAccessRule(models.Model):
     def cache_key_name(cls, course_id):
         return "{}/embargo/countries".format(course_id)
 
-    def _get_course_embargoed_countries(self, course_id):
-        course_embargoed_countries = cache.get(self.cache_key_name(course_id))
+    @classmethod
+    def _get_course_embargoed_countries(cls, course_id):
+        course_embargoed_countries = cache.get(cls.cache_key_name(course_id))
         if not course_embargoed_countries:
-            course_embargoed_countries = list(CountryAccessRule.objects.filter(course_key=course_id).values_list(
-                'country__country_code', flat=True
-            ))
-            cache.set(self.cache_key_name(course_id), course_embargoed_countries)
+            qry = CountryAccessRule.objects.filter(restricted_course__course_key=course_id)
+            qry = qry.values_list('country__country', flat=True)
+            course_embargoed_countries = list(qry)
+            cache.set(cls.cache_key_name(course_id), course_embargoed_countries)
         return course_embargoed_countries
 
     def __unicode__(self):
