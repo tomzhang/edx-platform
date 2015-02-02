@@ -15,6 +15,7 @@ import ipaddr
 
 from django.db import models
 from django.utils.translation import ugettext as _, ugettext_lazy
+from django.core.cache import cache
 
 from django_countries.fields import CountryField
 
@@ -123,8 +124,35 @@ class RestrictedCourse(models.Model):
         help_text=ugettext_lazy(u"The message to show when a user is blocked from accessing a course.")
     )
 
+    @classmethod
+    def cache_key_name(cls):
+        """Return the name of the key to use to cache the current restricted course list"""
+        return 'embargo/RestrictedCourse/courses'
+
+    @classmethod
+    def is_restricted_course(cls, course_id):
+        return course_id in cls._get_restricted_courses_from_cache()
+
+    def _get_restricted_courses_from_cache(self):
+        countries = cache.get(self.cache_key_name())
+        if not countries:
+            countries = RestrictedCourse.objects.values_list('course_key', flat=True)
+            cache.set(self.cache_key_name(), countries)
+        return countries
+
     def __unicode__(self):
         return unicode(self.course_key)
+
+    def save(self, *args, **kwargs):
+        """
+        Clear the cached value when saving a RestrictedCourse entry
+        """
+        super(RestrictedCourse, self).save(*args, **kwargs)
+        cache.delete(self.cache_key_name())
+
+    def delete(self, using=None):
+        super(RestrictedCourse, self).delete()
+        cache.delete(self.cache_key_name())
 
 
 class Country(models.Model):
@@ -195,6 +223,34 @@ class CountryAccessRule(models.Model):
         "Country",
         help_text=ugettext_lazy(u"The country to which this rule applies.")
     )
+
+    @classmethod
+    def is_course_embargoed_in_country(cls, course_id, country):
+        """
+        Check is the country is in the restricted list of countries for the course_id
+
+        Args:
+            course_id (str): course_id to look for
+            country (str): A 2 characters code of country
+
+        Returns:
+            True if the course is restricted in given country otherwise False
+
+        """
+        return country in cls._get_course_embargoed_countries(course_id)
+
+    @classmethod
+    def cache_key_name(cls, course_id):
+        return "{}/embargo/countries".format(course_id)
+
+    def _get_course_embargoed_countries(self, course_id):
+        course_embargoed_countries = cache.get(self.cache_key_name(course_id))
+        if not course_embargoed_countries:
+            course_embargoed_countries = list(CountryAccessRule.objects.filter(course_key=course_id).values_list(
+                'country__country_code', flat=True
+            ))
+            cache.set(self.cache_key_name(course_id), course_embargoed_countries)
+        return course_embargoed_countries
 
     def __unicode__(self):
         if self.rule_type == 'whitelist':

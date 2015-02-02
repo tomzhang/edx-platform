@@ -44,7 +44,7 @@ from ipware.ip import get_ip
 from util.request import course_id_from_url
 
 from student.models import unique_id_for_user
-from embargo.models import EmbargoedCourse, EmbargoedState, IPFilter
+from embargo.models import CountryAccessRule, EmbargoedState, IPFilter, RestrictedCourse
 
 log = logging.getLogger(__name__)
 
@@ -80,20 +80,20 @@ class EmbargoMiddleware(object):
         """
         url = request.path
         course_id = course_id_from_url(url)
-        course_is_embargoed = EmbargoedCourse.is_embargoed(course_id)
+        course_is_restricted = RestrictedCourse.is_restricted_course(course_id)
 
         # If they're trying to access a course that cares about embargoes
-        if self.site_enabled or course_is_embargoed:
+        if self.site_enabled or course_is_restricted:
 
             # Construct the list of functions that check whether the user is embargoed.
             # We wrap each of these functions in a decorator that logs the reason the user
             # was blocked.
             # Each function should return `True` iff the user is blocked by an embargo.
             check_functions = [
-                self._log_embargo_reason(check_func, course_id, course_is_embargoed)
+                self._log_embargo_reason(check_func, course_id, course_is_restricted)
                 for check_func in [
-                    partial(self._is_embargoed_by_ip, get_ip(request)),
-                    partial(self._is_embargoed_by_profile_country, request.user)
+                    partial(self._is_embargoed_by_ip, get_ip(request), course_id=course_id),
+                    partial(self._is_embargoed_by_profile_country, request.user, course_id=course_id)
                 ]
             ]
 
@@ -137,7 +137,7 @@ class EmbargoMiddleware(object):
         # Retrieve the country code from the IP address
         # and check it against the list of embargoed countries
         ip_country = self._country_code_from_ip(ip_addr)
-        if ip_country in self._embargoed_countries:
+        if CountryAccessRule.is_course_embargoed_in_country(course_id, ip_country):
             return self.REASONS['ip_country'].format(
                 ip_addr=ip_addr,
                 ip_country=ip_country,
@@ -172,7 +172,7 @@ class EmbargoMiddleware(object):
                 profile_country = ""
             cache.set(cache_key, profile_country)
 
-        if profile_country in self._embargoed_countries:
+        if CountryAccessRule.is_course_embargoed_in_country(course_id, profile_country):
             return self.REASONS['profile_country'].format(
                 user_id=unique_id_for_user(user),
                 profile_country=profile_country,
