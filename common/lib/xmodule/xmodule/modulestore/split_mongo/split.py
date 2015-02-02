@@ -1889,7 +1889,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             xblock_class,
             course_key,
             BlockKey(block_type, block_id) if block_id else None,
-            BlockData(json_data),
+            BlockData(**json_data),
             **kwargs
         )
         for field_name, value in (fields or {}).iteritems():
@@ -2942,7 +2942,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         }
         if block_defaults:
             document['defaults'] = block_defaults
-        return BlockData(document)
+        return BlockData(**document)
 
     @contract(block_key=BlockKey, returns='BlockData | None')
     def _get_block_from_structure(self, structure, block_key):

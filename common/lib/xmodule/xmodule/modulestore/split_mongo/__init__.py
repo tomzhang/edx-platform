@@ -27,12 +27,12 @@ class EditInfo(object):
     """
     Encapsulates the editing info of a block.
     """
-    def __init__(self, edit_info={}):  # pylint: disable=dangerous-default-value
-        self.from_storable(edit_info)
+    def __init__(self, **kwargs):
+        self.from_storable(kwargs)
 
         # For details, see caching_descriptor_system.py get_subtree_edited_by/on.
-        self._subtree_edited_on = edit_info.get('_subtree_edited_on', None)
-        self._subtree_edited_by = edit_info.get('_subtree_edited_by', None)
+        self._subtree_edited_on = kwargs.get('_subtree_edited_on', None)
+        self._subtree_edited_by = kwargs.get('_subtree_edited_by', None)
 
     def to_storable(self):
         """
@@ -48,28 +48,28 @@ class EditInfo(object):
             'original_usage_version': self.original_usage_version,
         }
 
-    def from_storable(self, edit_info):
+    def from_storable(self, kwargs):
         """
         De-serialize from Mongo-storable format to an object.
         """
         # Guid for the structure which previously changed this XBlock.
         # (Will be the previous value of 'update_version'.)
-        self.previous_version = edit_info.get('previous_version', None)
+        self.previous_version = kwargs.get('previous_version', None)
 
         # Guid for the structure where this XBlock got its current field values.
         # May point to a structure not in this structure's history (e.g., to a draft
         # branch from which this version was published).
-        self.update_version = edit_info.get('update_version', None)
+        self.update_version = kwargs.get('update_version', None)
 
-        self.source_version = edit_info.get('source_version', None)
+        self.source_version = kwargs.get('source_version', None)
 
         # Datetime when this XBlock's fields last changed.
-        self.edited_on = edit_info.get('edited_on', None)
+        self.edited_on = kwargs.get('edited_on', None)
         # User ID which changed this XBlock last.
-        self.edited_by = edit_info.get('edited_by', None)
+        self.edited_by = kwargs.get('edited_by', None)
 
-        self.original_usage = edit_info.get('original_usage', None)
-        self.original_usage_version = edit_info.get('original_usage_version', None)
+        self.original_usage = kwargs.get('original_usage', None)
+        self.original_usage_version = kwargs.get('original_usage_version', None)
 
     def __str__(self):
         return ("EditInfo(previous_version={0.previous_version}, "
@@ -89,11 +89,10 @@ class BlockData(object):
     Allows the storing of meta-information about a structure that doesn't persist along with
     the structure itself.
     """
-    @contract(block_dict=dict)
-    def __init__(self, block_dict={}):  # pylint: disable=dangerous-default-value
+    def __init__(self, **kwargs):
         # Has the definition been loaded?
         self.definition_loaded = False
-        self.from_storable(block_dict)
+        self.from_storable(kwargs)
 
     def to_storable(self):
         """
@@ -107,27 +106,26 @@ class BlockData(object):
             'edit_info': self.edit_info.to_storable()
         }
 
-    @contract(stored=dict)
-    def from_storable(self, stored):
+    def from_storable(self, kwargs):
         """
         De-serialize from Mongo-storable format to an object.
         """
         # Contains the Scope.settings and 'children' field values.
         # 'children' are stored as a list of (block_type, block_id) pairs.
-        self.fields = stored.get('fields', {})
+        self.fields = kwargs.get('fields', {})
 
         # XBlock type ID.
-        self.block_type = stored.get('block_type', None)
+        self.block_type = kwargs.get('block_type', None)
 
         # DB id of the record containing the content of this XBlock.
-        self.definition = stored.get('definition', None)
+        self.definition = kwargs.get('definition', None)
 
         # Scope.settings default values copied from a template block (used e.g. when
         # blocks are copied from a library to a course)
-        self.defaults = stored.get('defaults', {})
+        self.defaults = kwargs.get('defaults', {})
 
         # EditInfo object containing all versioning/editing data.
-        self.edit_info = EditInfo(stored.get('edit_info', {}))
+        self.edit_info = EditInfo(**kwargs.get('edit_info', {}))
 
     def __str__(self):
         return ("BlockData(fields={0.fields}, "

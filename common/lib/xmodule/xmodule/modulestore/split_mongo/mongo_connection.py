@@ -37,7 +37,7 @@ def structure_from_mongo(structure):
     for block in structure['blocks']:
         if 'children' in block['fields']:
             block['fields']['children'] = [BlockKey(*child) for child in block['fields']['children']]
-        new_blocks[BlockKey(block['block_type'], block.pop('block_id'))] = BlockData(block)
+        new_blocks[BlockKey(block['block_type'], block.pop('block_id'))] = BlockData(**block)
     structure['blocks'] = new_blocks
 
     return structure
