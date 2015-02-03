@@ -132,8 +132,8 @@ END
                 ;;
             "other")
                 paver test_system -s cms --cov_args="-p"
-                paver test_js
-                paver test_lib --cov_args="-p"
+                paver test_js --skip_clean
+                paver test_lib --cov_args="-p" --skip_clean
                 ;;
             *)
                 paver test
