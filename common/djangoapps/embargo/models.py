@@ -228,8 +228,26 @@ class CountryAccessRule(models.Model):
         help_text=ugettext_lazy(u"The country to which this rule applies.")
     )
 
+    # @classmethod
+    # def is_course_embargoed_in_blacklist_country(cls, course_id, country):
+    #     """
+    #     Check is the country is in the restricted list of countries for the course_id
+    #
+    #     Args:
+    #         course_id (str): course_id to look for
+    #         country (str): A 2 characters code of country
+    #
+    #     Returns:
+    #         True if the course is restricted in given country otherwise False
+    #
+    #     """
+    #     country_access_blacklist = cls._get_course_embargoed_blacklist_countries(course_id)
+    #     if not country_access_blacklist:
+    #         return True
+    #     return country_access_blacklist and country in country_access_blacklist
+
     @classmethod
-    def is_course_embargoed_in_country(cls, course_id, country):
+    def is_course_embargoed_in_country_list(cls, course_id, country, rule_type):
         """
         Check is the country is in the restricted list of countries for the course_id
 
@@ -241,20 +259,33 @@ class CountryAccessRule(models.Model):
             True if the course is restricted in given country otherwise False
 
         """
-        return country in cls._get_course_embargoed_countries(course_id)
+        country_access_list = cls._get_course_embargoed_list_countries_with_rule_type(course_id, rule_type)
+        if not country_access_list:
+            return True
+        return country_access_list and country in country_access_list
 
     @classmethod
-    def cache_key_name(cls, course_id):
-        return "{}/embargo/countries".format(course_id)
+    def cache_key_name(cls, course_id, cache_type):
+        return "{}/embargo/countries/{}".format(course_id, cache_type)
+
+    # @classmethod
+    # def _get_course_embargoed_blacklist_countries(cls, course_id):
+    #     course_embargoed_countries = cache.get(cls.cache_key_name(course_id, 'black_list'))
+    #     if course_embargoed_countries is None:
+    #         qry = CountryAccessRule.objects.filter(restricted_course__course_key=course_id, rule_type='blacklist')
+    #         qry = qry.values_list('country__country', flat=True)
+    #         course_embargoed_countries = list(qry)
+    #         cache.set(cls.cache_key_name(course_id,'black_list'), course_embargoed_countries)
+    #     return course_embargoed_countries
 
     @classmethod
-    def _get_course_embargoed_countries(cls, course_id):
-        course_embargoed_countries = cache.get(cls.cache_key_name(course_id))
+    def _get_course_embargoed_list_countries_with_rule_type(cls, course_id, rule_type):
+        course_embargoed_countries = cache.get(cls.cache_key_name(course_id, rule_type))
         if course_embargoed_countries is None:
-            qry = CountryAccessRule.objects.filter(restricted_course__course_key=course_id)
+            qry = CountryAccessRule.objects.filter(restricted_course__course_key=course_id, rule_type=rule_type)
             qry = qry.values_list('country__country', flat=True)
             course_embargoed_countries = list(qry)
-            cache.set(cls.cache_key_name(course_id), course_embargoed_countries)
+            cache.set(cls.cache_key_name(course_id, rule_type), course_embargoed_countries)
         return course_embargoed_countries
 
     def __unicode__(self):

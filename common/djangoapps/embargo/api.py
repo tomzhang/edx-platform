@@ -30,25 +30,28 @@ REASONS = {
     )
 }
 
+WHITE_LIST = "whitelist"
+BLACK_LIST = "blacklist"
+
 
 def _from_course_msg(course_id, course_is_embargoed):
-        """
-        Format a message indicating whether the user was blocked from a specific course.
-        This can be used in info messages, but should not be used in user-facing messages.
+    """
+    Format a message indicating whether the user was blocked from a specific course.
+    This can be used in info messages, but should not be used in user-facing messages.
 
-        Args:
-            course_id (unicode): The ID of the course being accessed.
-            course_is_embarged (boolean): Whether the course being accessed is embargoed.
+    Args:
+        course_id (unicode): The ID of the course being accessed.
+        course_is_embarged (boolean): Whether the course being accessed is embargoed.
 
-        Returns:
-            unicode
+    Returns:
+        unicode
 
-        """
-        return (
-            u"from course {course_id}".format(course_id=course_id)
-            if course_is_embargoed
-            else u""
-        )
+    """
+    return (
+        u"from course {course_id}".format(course_id=course_id)
+        if course_is_embargoed
+        else u""
+    )
 
 
 def _log_embargo_reason(check_func, course_id, course_is_embargoed):
@@ -73,6 +76,7 @@ def _log_embargo_reason(check_func, course_id, course_is_embargoed):
         boolean: True iff the user was blocked by an embargo
 
     """
+
     def _inner():
         # Perform the check and retrieve the reason string.
         # The reason will be `None` if the user passes the check and can access the course.
@@ -146,16 +150,20 @@ def _is_embargoed_by_ip(ip_addr, course_id=u"", course_is_embargoed=False):
     # Retrieve the country code from the IP address
     # and check it against the list of embargoed countries
     ip_country = _country_code_from_ip(ip_addr)
-    if course_id and CountryAccessRule().is_course_embargoed_in_country(course_id, ip_country):
+
+    if course_id and not CountryAccessRule.is_course_embargoed_in_country_list(course_id, ip_country, "whitelist"):
         return REASONS['ip_country'].format(
             ip_addr=ip_addr,
             ip_country=ip_country,
             from_course=_from_course_msg(course_id, course_is_embargoed)
         )
 
-    # If none of the other checks caught anything,
-    # implicitly return None to indicate that the user can access the course
-
+    if course_id and CountryAccessRule.is_course_embargoed_in_country_list(course_id, ip_country, "blacklist"):
+        return REASONS['ip_country'].format(
+            ip_addr=ip_addr,
+            ip_country=ip_country,
+            from_course=_from_course_msg(course_id, course_is_embargoed)
+        )
 
 def _is_embargoed_by_profile_country(user, course_id="", course_is_embargoed=False):
     """
@@ -182,14 +190,18 @@ def _is_embargoed_by_profile_country(user, course_id="", course_is_embargoed=Fal
             profile_country = ""
         cache.set(cache_key, profile_country)
 
-    if course_id and CountryAccessRule().is_course_embargoed_in_country(course_id, profile_country):
+    if course_id and not CountryAccessRule.is_course_embargoed_in_country_list(course_id, profile_country, "whitelist"):
         return REASONS['profile_country'].format(
             user_id=unique_id_for_user(user),
             profile_country=profile_country,
             from_course=_from_course_msg(course_id, course_is_embargoed)
         )
-    else:
-        return None
+    if course_id and CountryAccessRule.is_course_embargoed_in_country_list(course_id, profile_country, "blacklist"):
+        return REASONS['profile_country'].format(
+            user_id=unique_id_for_user(user),
+            profile_country=profile_country,
+            from_course=_from_course_msg(course_id, course_is_embargoed)
+        )
 
 
 def _country_code_from_ip(ip_addr):
@@ -246,6 +258,6 @@ def check_access(user, ip_address, course_key):
             if check_func():
                 return _embargo_redirect_response()
 
-    # If all the check functions pass, implicitly return None
-    # so that the middleware processor can continue processing
-    # the response.
+                # If all the check functions pass, implicitly return None
+                # so that the middleware processor can continue processing
+                # the response.
