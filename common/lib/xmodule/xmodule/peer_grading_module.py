@@ -497,7 +497,7 @@ class PeerGradingModule(PeerGradingFields, XModule):
         try:
             response = self.peer_gs.save_calibration_essay(**data_dict)
             if 'actual_rubric' in response:
-                rubric_renderer = combined_open_ended_rubric.CombinedOpenEndedRubric(self.render_template, True)
+                rubric_renderer = combined_open_ended_rubric.CombinedOpenEndedRubric(self.system.render_template, True)
                 response['actual_rubric'] = rubric_renderer.render_rubric(response['actual_rubric'])['html']
             return response
         except GradingServiceError:
