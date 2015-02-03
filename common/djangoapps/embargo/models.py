@@ -133,6 +133,7 @@ class RestrictedCourse(models.Model):
     def is_restricted_course(cls, course_id):
         return unicode(course_id) in cls._get_restricted_courses_from_cache()
 
+    @classmethod
     def _get_restricted_courses_from_cache(self):
         """
         Cache all restricted courses and returns the list of course_keys that are restricted
@@ -249,7 +250,7 @@ class CountryAccessRule(models.Model):
     @classmethod
     def _get_course_embargoed_countries(cls, course_id):
         course_embargoed_countries = cache.get(cls.cache_key_name(course_id))
-        if not course_embargoed_countries:
+        if course_embargoed_countries is None:
             qry = CountryAccessRule.objects.filter(restricted_course__course_key=course_id)
             qry = qry.values_list('country__country', flat=True)
             course_embargoed_countries = list(qry)

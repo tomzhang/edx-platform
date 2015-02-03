@@ -192,7 +192,7 @@ def _is_embargoed_by_profile_country(user, course_id="", course_is_embargoed=Fal
         return None
 
 
-def _country_code_from_ip(self, ip_addr):
+def _country_code_from_ip(ip_addr):
     """
     Return the country code associated with an IP address.
     Handles both IPv4 and IPv6 addresses.
@@ -244,7 +244,7 @@ def check_access(user, ip_address, course_key):
         # and skip later checks.
         for check_func in check_functions:
             if check_func():
-                return _embargo_redirect_response
+                return _embargo_redirect_response()
 
     # If all the check functions pass, implicitly return None
     # so that the middleware processor can continue processing
