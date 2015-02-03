@@ -15,7 +15,7 @@ from django.conf import settings
 from django.http import HttpResponseRedirect, HttpResponseForbidden
 
 from student.models import unique_id_for_user
-from embargo.models import CountryAccessRule, IPFilter, RestrictedCourse
+from embargo.models import CountryAccessRule, IPFilter, RestrictedCourse, WHITE_LIST, BLACK_LIST
 
 log = logging.getLogger(__name__)
 
@@ -29,9 +29,6 @@ REASONS = {
         u"the user set the profile country to {profile_country}."
     )
 }
-
-WHITE_LIST = "whitelist"
-BLACK_LIST = "blacklist"
 
 
 def _from_course_msg(course_id, course_is_embargoed):
@@ -151,19 +148,20 @@ def _is_embargoed_by_ip(ip_addr, course_id=u"", course_is_embargoed=False):
     # and check it against the list of embargoed countries
     ip_country = _country_code_from_ip(ip_addr)
 
-    if course_id and not CountryAccessRule.is_course_embargoed_in_country_list(course_id, ip_country, "whitelist"):
+    if course_id and not CountryAccessRule.is_course_embargoed_in_country_list(course_id, ip_country, WHITE_LIST):
         return REASONS['ip_country'].format(
             ip_addr=ip_addr,
             ip_country=ip_country,
             from_course=_from_course_msg(course_id, course_is_embargoed)
         )
 
-    if course_id and CountryAccessRule.is_course_embargoed_in_country_list(course_id, ip_country, "blacklist"):
+    if course_id and CountryAccessRule.is_course_embargoed_in_country_list(course_id, ip_country, BLACK_LIST):
         return REASONS['ip_country'].format(
             ip_addr=ip_addr,
             ip_country=ip_country,
             from_course=_from_course_msg(course_id, course_is_embargoed)
         )
+
 
 def _is_embargoed_by_profile_country(user, course_id="", course_is_embargoed=False):
     """
@@ -190,13 +188,13 @@ def _is_embargoed_by_profile_country(user, course_id="", course_is_embargoed=Fal
             profile_country = ""
         cache.set(cache_key, profile_country)
 
-    if course_id and not CountryAccessRule.is_course_embargoed_in_country_list(course_id, profile_country, "whitelist"):
+    if course_id and not CountryAccessRule.is_course_embargoed_in_country_list(course_id, profile_country, WHITE_LIST):
         return REASONS['profile_country'].format(
             user_id=unique_id_for_user(user),
             profile_country=profile_country,
             from_course=_from_course_msg(course_id, course_is_embargoed)
         )
-    if course_id and CountryAccessRule.is_course_embargoed_in_country_list(course_id, profile_country, "blacklist"):
+    if course_id and CountryAccessRule.is_course_embargoed_in_country_list(course_id, profile_country, BLACK_LIST):
         return REASONS['profile_country'].format(
             user_id=unique_id_for_user(user),
             profile_country=profile_country,

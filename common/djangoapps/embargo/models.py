@@ -25,6 +25,10 @@ from xmodule_django.models import CourseKeyField, NoneToEmptyManager
 from embargo.messages import ENROLL_MESSAGES, ACCESS_MESSAGES
 
 
+WHITE_LIST = 'whitelist'
+BLACK_LIST = 'blacklist'
+
+
 class EmbargoedCourse(models.Model):
     """
     Enable course embargo on a course-by-course basis.
@@ -202,14 +206,14 @@ class CountryAccessRule(models.Model):
     """
 
     RULE_TYPE_CHOICES = (
-        ('whitelist', 'Whitelist (allow only these countries)'),
-        ('blacklist', 'Blacklist (block these countries)'),
+        (WHITE_LIST, 'Whitelist (allow only these countries)'),
+        (BLACK_LIST, 'Blacklist (block these countries)'),
     )
 
     rule_type = models.CharField(
         max_length=255,
         choices=RULE_TYPE_CHOICES,
-        default='blacklist',
+        default=BLACK_LIST,
         help_text=ugettext_lazy(
             u"Whether to include or exclude the given course. "
             u"If whitelist countries are specified, then ONLY users from whitelisted countries "
@@ -227,24 +231,6 @@ class CountryAccessRule(models.Model):
         "Country",
         help_text=ugettext_lazy(u"The country to which this rule applies.")
     )
-
-    # @classmethod
-    # def is_course_embargoed_in_blacklist_country(cls, course_id, country):
-    #     """
-    #     Check is the country is in the restricted list of countries for the course_id
-    #
-    #     Args:
-    #         course_id (str): course_id to look for
-    #         country (str): A 2 characters code of country
-    #
-    #     Returns:
-    #         True if the course is restricted in given country otherwise False
-    #
-    #     """
-    #     country_access_blacklist = cls._get_course_embargoed_blacklist_countries(course_id)
-    #     if not country_access_blacklist:
-    #         return True
-    #     return country_access_blacklist and country in country_access_blacklist
 
     @classmethod
     def is_course_embargoed_in_country_list(cls, course_id, country, rule_type):
@@ -267,16 +253,6 @@ class CountryAccessRule(models.Model):
     @classmethod
     def cache_key_name(cls, course_id, cache_type):
         return "{}/embargo/countries/{}".format(course_id, cache_type)
-
-    # @classmethod
-    # def _get_course_embargoed_blacklist_countries(cls, course_id):
-    #     course_embargoed_countries = cache.get(cls.cache_key_name(course_id, 'black_list'))
-    #     if course_embargoed_countries is None:
-    #         qry = CountryAccessRule.objects.filter(restricted_course__course_key=course_id, rule_type='blacklist')
-    #         qry = qry.values_list('country__country', flat=True)
-    #         course_embargoed_countries = list(qry)
-    #         cache.set(cls.cache_key_name(course_id,'black_list'), course_embargoed_countries)
-    #     return course_embargoed_countries
 
     @classmethod
     def _get_course_embargoed_list_countries_with_rule_type(cls, course_id, rule_type):
