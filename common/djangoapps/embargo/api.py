@@ -118,7 +118,7 @@ def _embargo_redirect_response():
     return response
 
 
-def _is_embargoed_by_ip(ip_addr, course_id=u"", course_is_embargoed=False):
+def _check_ip_lists(ip_addr, course_id=u""):
     """
     Check whether the user is embargoed based on the IP address.
 
@@ -135,37 +135,24 @@ def _is_embargoed_by_ip(ip_addr, course_id=u"", course_is_embargoed=False):
     """
     # If blacklisted, immediately fail
     if ip_addr in IPFilter.current().blacklist_ips:
-        return REASONS['ip_blacklist'].format(
-            ip_addr=ip_addr,
-            from_course=_from_course_msg(course_id, course_is_embargoed)
-        )
+        return True
+        # return REASONS['ip_blacklist'].format(
+        # ip_addr=ip_addr,
+        # from_course=_from_course_msg(course_id, course_is_embargoed)
+        # )
 
     # If we're white-listed, then allow access
     if ip_addr in IPFilter.current().whitelist_ips:
         return None
 
+
+def _check_user_country(country_code, course_id=u""):
     # Retrieve the country code from the IP address
     # and check it against the list of embargoed countries
-    ip_country = _country_code_from_ip(ip_addr)
-
-    # with whitelist if returns false return error
-    if not CountryAccessRule.is_course_embargoed_in_country_list(course_id, ip_country, WHITE_LIST):
-        return REASONS['ip_country'].format(
-            ip_addr=ip_addr,
-            ip_country=ip_country,
-            from_course=_from_course_msg(course_id, course_is_embargoed)
-        )
-
-    # with blacklist if returns true return error
-    if CountryAccessRule.is_course_embargoed_in_country_list(course_id, ip_country, BLACK_LIST):
-        return REASONS['ip_country'].format(
-            ip_addr=ip_addr,
-            ip_country=ip_country,
-            from_course=_from_course_msg(course_id, course_is_embargoed)
-        )
+    return CountryAccessRule.check_country_access(course_id, country_code)
 
 
-def _is_embargoed_by_profile_country(user, course_id="", course_is_embargoed=False):
+def get_user_country_from_profile(user, course_id=""):
     """
     Check whether the user is embargoed based on the country code in the user's profile.
 
@@ -190,22 +177,7 @@ def _is_embargoed_by_profile_country(user, course_id="", course_is_embargoed=Fal
             profile_country = ""
         cache.set(cache_key, profile_country)
 
-    # with whitelist if returns false return error
-    if not CountryAccessRule.is_course_embargoed_in_country_list(course_id, profile_country, WHITE_LIST):
-        return REASONS['profile_country'].format(
-            user_id=unique_id_for_user(user),
-            profile_country=profile_country,
-            from_course=_from_course_msg(course_id, course_is_embargoed)
-        )
-
-    # with blacklist if returns true return error
-    if CountryAccessRule.is_course_embargoed_in_country_list(course_id, profile_country, BLACK_LIST):
-        return REASONS['profile_country'].format(
-            user_id=unique_id_for_user(user),
-            profile_country=profile_country,
-            from_course=_from_course_msg(course_id, course_is_embargoed)
-        )
-
+    return profile_country
 
 def _country_code_from_ip(ip_addr):
     """
@@ -238,29 +210,33 @@ def check_access(user, ip_address, course_key):
         Redirect to a URL configured in Django settings or a forbidden response if any constraints fails or None
 
     """
+
     course_is_restricted = RestrictedCourse.is_restricted_course(course_key)
     # If they're trying to access a course that cares about embargoes
-    if course_is_restricted:
 
-        # Construct the list of functions that check whether the user is embargoed.
-        # We wrap each of these functions in a decorator that logs the reason the user
-        # was blocked.
-        # Each function should return `True` iff the user is blocked by an embargo.
-        check_functions = [
-            _log_embargo_reason(check_func, course_key, course_is_restricted)
-            for check_func in [
-                partial(_is_embargoed_by_ip, ip_address, course_id=course_key),
-                partial(_is_embargoed_by_profile_country, user, course_id=course_key)
-            ]
-        ]
+    if not course_is_restricted:
+        return None
 
-        # Perform each of the checks
-        # If the user fails any of the checks, immediately redirect them
-        # and skip later checks.
-        for check_func in check_functions:
-            if check_func():
-                return _embargo_redirect_response()
+    if _check_ip_lists(ip_address, course_key):
+        return REASONS['ip_blacklist'].format(
+            ip_addr=ip_address,
+            from_course=_from_course_msg(course_key, course_is_restricted)
+        )
 
-                # If all the check functions pass, implicitly return None
-                # so that the middleware processor can continue processing
-                # the response.
+    user_country_from_ip = _country_code_from_ip(ip_address)
+    if _check_user_country(user_country_from_ip, course_key):
+        return REASONS['ip_country'].format(
+            ip_addr=ip_address,
+            ip_country=user_country_from_ip,
+            from_course=_from_course_msg(course_key, course_is_restricted)
+        )
+
+    user_country_from_profile = get_user_country_from_profile(user, course_key)
+    if _check_user_country(user_country_from_profile, course_key):
+        return REASONS['profile_country'].format(
+                user_id=unique_id_for_user(user),
+                profile_country=user_country_from_profile,
+                from_course=_from_course_msg(course_key, course_is_restricted)
+        )
+
+    return None
