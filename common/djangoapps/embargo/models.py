@@ -235,20 +235,24 @@ class CountryAccessRule(models.Model):
     @classmethod
     def is_course_embargoed_in_country_list(cls, course_id, country, rule_type):
         """
-        Check is the country is in the restricted list of countries for the course_id
+        Check if the country is either in whitelist or blacklist of countries for the course_id
 
         Args:
             course_id (str): course_id to look for
             country (str): A 2 characters code of country
+            rule_type (str): whitelist or blacklist
 
         Returns:
-            True if the course is restricted in given country otherwise False
-
+            Boolean
+            True if no country found for the given course and rule type
+            otherwise check given country exists in list
         """
-        country_access_list = cls._get_course_embargoed_list_countries_with_rule_type(course_id, rule_type)
-        if not country_access_list:
+        country_access_rules = cls._get_course_embargoed_list_countries_with_rule_type(course_id, rule_type)
+        if not country_access_rules:
             return True
-        return country_access_list and country in country_access_list
+
+        return country in country_access_rules
+
 
     @classmethod
     def cache_key_name(cls, course_id, cache_type):
