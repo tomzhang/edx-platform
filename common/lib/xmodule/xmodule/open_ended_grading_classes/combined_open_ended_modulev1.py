@@ -159,7 +159,7 @@ class CombinedOpenEndedV1Module():
             raise
         self.display_due_date = self.timeinfo.display_due_date
 
-        self.rubric_renderer = CombinedOpenEndedRubric(system, True)
+        self.rubric_renderer = CombinedOpenEndedRubric(system.render_template, True)
         rubric_string = stringify_children(definition['rubric'])
         self._max_score = self.rubric_renderer.check_if_rubric_is_parseable(rubric_string, location, MAX_SCORE_ALLOWED)
 
