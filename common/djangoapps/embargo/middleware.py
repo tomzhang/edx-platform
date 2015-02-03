@@ -44,7 +44,8 @@ from ipware.ip import get_ip
 from util.request import course_id_from_url
 
 from student.models import unique_id_for_user
-from embargo.models import EmbargoedCourse, CountryAccessRule, EmbargoedState, IPFilter, RestrictedCourse
+from embargo.models import EmbargoedCourse, EmbargoedState, IPFilter
+from embargo.api import check_access
 
 log = logging.getLogger(__name__)
 
@@ -73,14 +74,14 @@ class EmbargoMiddleware(object):
         # If embargoing is turned off, make this middleware do nothing
         if not settings.FEATURES.get('EMBARGO', False) and not self.site_enabled:
             raise MiddlewareNotUsed()
-        self.new_implementation_enabled = settings.FEATURES.get('NEW_MIDDLE_WARE_IMPLEMENTATION', False)
+        self.enable_country_access = settings.FEATURES.get('ENABLE_COUNTRY_ACCESS', False)
 
     def process_request(self, request):
         """
         Processes embargo requests.
         """
-        if self.new_implementation_enabled:
-            return self.new_implementation(request)
+        if self.enable_country_access:
+            return self.country_access_rules(request)
         else:
             url = request.path
             course_id = course_id_from_url(url)
@@ -111,37 +112,6 @@ class EmbargoMiddleware(object):
             # If all the check functions pass, implicitly return None
             # so that the middleware processor can continue processing
             # the response.
-
-    def new_implementation(self, request):
-        url = request.path
-        course_id = course_id_from_url(url)
-        course_is_restricted = RestrictedCourse().is_restricted_course(course_id)
-
-        # If they're trying to access a course that cares about embargoes
-        if self.site_enabled or course_is_restricted:
-
-            # Construct the list of functions that check whether the user is embargoed.
-            # We wrap each of these functions in a decorator that logs the reason the user
-            # was blocked.
-            # Each function should return `True` iff the user is blocked by an embargo.
-            check_functions = [
-                self._log_embargo_reason(check_func, course_id, course_is_restricted)
-                for check_func in [
-                    partial(self._is_embargoed_by_ip_new, get_ip(request), course_id=course_id),
-                    partial(self._is_embargoed_by_profile_country_new, request.user, course_id=course_id)
-                ]
-            ]
-
-            # Perform each of the checks
-            # If the user fails any of the checks, immediately redirect them
-            # and skip later checks.
-            for check_func in check_functions:
-                if check_func():
-                    return self._embargo_redirect_response
-
-        # If all the check functions pass, implicitly return None
-        # so that the middleware processor can continue processing
-        # the response.
 
     def _is_embargoed_by_ip(self, ip_addr, course_id=u"", course_is_embargoed=False):
         """
@@ -208,79 +178,6 @@ class EmbargoMiddleware(object):
             cache.set(cache_key, profile_country)
 
         if profile_country in self._embargoed_countries:
-            return self.REASONS['profile_country'].format(
-                user_id=unique_id_for_user(user),
-                profile_country=profile_country,
-                from_course=self._from_course_msg(course_id, course_is_embargoed)
-            )
-        else:
-            return None
-
-    def _is_embargoed_by_ip_new(self, ip_addr, course_id=u"", course_is_embargoed=False):
-        """
-        Check whether the user is embargoed based on the IP address.
-
-        Args:
-            ip_addr (str): The IP address the request originated from.
-
-        Keyword Args:
-            course_id (unicode): The course the user is trying to access.
-            course_is_embargoed (boolean): Whether the course the user is accessing has been embargoed.
-
-        Returns:
-            A unicode message if the user is embargoed, otherwise `None`
-
-        """
-        # If blacklisted, immediately fail
-        if ip_addr in IPFilter.current().blacklist_ips:
-            return self.REASONS['ip_blacklist'].format(
-                ip_addr=ip_addr,
-                from_course=self._from_course_msg(course_id, course_is_embargoed)
-            )
-
-        # If we're white-listed, then allow access
-        if ip_addr in IPFilter.current().whitelist_ips:
-            return None
-
-        # Retrieve the country code from the IP address
-        # and check it against the list of embargoed countries
-        ip_country = self._country_code_from_ip(ip_addr)
-        if course_id and CountryAccessRule().is_course_embargoed_in_country(course_id, ip_country):
-            return self.REASONS['ip_country'].format(
-                ip_addr=ip_addr,
-                ip_country=ip_country,
-                from_course=self._from_course_msg(course_id, course_is_embargoed)
-            )
-
-        # If none of the other checks caught anything,
-        # implicitly return None to indicate that the user can access the course
-
-    def _is_embargoed_by_profile_country_new(self, user, course_id="", course_is_embargoed=False):
-        """
-        Check whether the user is embargoed based on the country code in the user's profile.
-
-        Args:
-            user (User): The user attempting to access courseware.
-
-        Keyword Args:
-            course_id (unicode): The course the user is trying to access.
-            course_is_embargoed (boolean): Whether the course the user is accessing has been embargoed.
-
-        Returns:
-            A unicode message if the user is embargoed, otherwise `None`
-
-        """
-        cache_key = u'user.{user_id}.profile.country'.format(user_id=user.id)
-        profile_country = cache.get(cache_key)
-        if profile_country is None:
-            profile = getattr(user, 'profile', None)
-            if profile is not None and profile.country.code is not None:
-                profile_country = profile.country.code.upper()
-            else:
-                profile_country = ""
-            cache.set(cache_key, profile_country)
-
-        if course_id and CountryAccessRule().is_course_embargoed_in_country(course_id, profile_country):
             return self.REASONS['profile_country'].format(
                 user_id=unique_id_for_user(user),
                 profile_country=profile_country,
@@ -405,3 +302,8 @@ class EmbargoMiddleware(object):
                 return True
 
         return _inner
+
+    def country_access_rules(self, request):
+        url = request.path
+        course_id = course_id_from_url(url)
+        return check_access(request.user, get_ip(request), course_id)

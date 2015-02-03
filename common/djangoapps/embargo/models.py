@@ -129,10 +129,14 @@ class RestrictedCourse(models.Model):
         """Return the name of the key to use to cache the current restricted course list"""
         return 'embargo/RestrictedCourse/courses'
 
-    def is_restricted_course(self, course_id):
-        return unicode(course_id) in self._get_restricted_courses_from_cache()
+    @classmethod
+    def is_restricted_course(cls, course_id):
+        return unicode(course_id) in cls._get_restricted_courses_from_cache()
 
     def _get_restricted_courses_from_cache(self):
+        """
+        Cache all restricted courses and returns the list of course_keys that are restricted
+        """
         countries = cache.get(self.cache_key_name())
         if not countries:
             countries = list(RestrictedCourse.objects.values_list('course_key', flat=True))
