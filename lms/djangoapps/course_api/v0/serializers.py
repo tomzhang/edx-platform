@@ -98,3 +98,16 @@ class GradingPolicySerializer(serializers.Serializer):
     count = serializers.IntegerField(source='min_count')
     dropped = serializers.IntegerField(source='drop_count')
     weight = serializers.FloatField()
+
+
+class CourseStructureSerializer(serializers.Serializer):
+    root = serializers.CharField(source='root')
+    blocks = serializers.SerializerMethodField('get_blocks')
+
+    def get_blocks(self, structure):
+        serialized = {}
+
+        for key, block in structure.blocks.iteritems():
+            serialized[key] = block.__dict__
+
+        return serialized

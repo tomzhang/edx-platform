@@ -22,8 +22,8 @@ content_patterns = patterns(
 course_patterns = patterns(
     '',
     url(r'^$', views.CourseDetail.as_view(), name='detail'),
-    url(r'^graded_content/$', views.CourseGradedContent.as_view(), name='graded_content'),
     url(r'^grading_policy/$', views.CourseGradingPolicy.as_view(), name='grading_policy'),
+    url(r'^structure/$', views.CourseStructure.as_view(), name='structure'),
     url(r'^content/', include(content_patterns, namespace='content')),
 )
 
