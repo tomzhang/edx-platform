@@ -277,11 +277,6 @@ class CountryAccessRule(models.Model):
         return countries_list
 
     @classmethod
-    def cache_key_name(cls, course_id, cache_type):
-        return "{}/embargo/countries/{}".format(course_id, cache_type)
-
-
-    @classmethod
     def _get_country_access_rules_for_course(cls, course_id, rule_type):
         qry = CountryAccessRule.objects.filter(restricted_course__course_key=course_id, rule_type=rule_type)
         qry = qry.values_list('country__country', flat=True)
@@ -308,6 +303,20 @@ class CountryAccessRule(models.Model):
             ("restricted_course", "country")
         )
 
+    @classmethod
+    def cache_key_name(cls, course_id, cache_type):
+        return "{}/embargo/countries/{}".format(course_id, cache_type)
+
+    def save(self, *args, **kwargs):
+        """
+        Clear the cached value when saving a RestrictedCourse entry
+        """
+        super(CountryAccessRule, self).save(*args, **kwargs)
+        cache.delete(self.cache_key_name(self.restricted_course.course_key,self.rule_type))
+
+    def delete(self, using=None):
+        super(CountryAccessRule, self).delete()
+        cache.delete(self.cache_key_name(self.restricted_course.course_key,self.rule_type))
 
 class IPFilter(ConfigurationModel):
     """
