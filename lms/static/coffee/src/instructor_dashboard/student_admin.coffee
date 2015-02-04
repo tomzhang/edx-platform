@@ -270,22 +270,24 @@ class @StudentAdmin
       unique_student_identifier = @$field_entrance_exam_student_select_grade.val()
       if not unique_student_identifier
         return @$request_response_error_ee.text gettext("Please enter a student email address or username.")
-      confirm_message = gettext("Mark student '<%= student_id %>' to skip entrance exam?")
-      full_confirm_message = _.template(confirm_message, {student_id: unique_student_identifier})
+      confirm_message = gettext("Mark student '{student_id}' to skip entrance exam?")
+      full_confirm_message = interpolate_text(confirm_message, {student_id: unique_student_identifier})
       if window.confirm full_confirm_message
         send_data =
           unique_student_identifier: unique_student_identifier
-        success_message = gettext("Student '<%= student_id %>' is marked to skip entrance exam.")
-        error_message = gettext("Error marking student '<%= student_id %>' to skip entrance exam.. Make sure student identifier is correct.")
-        full_success_message = _.template(success_message, {student_id: unique_student_identifier})
-        full_error_message = _.template(error_message, {student_id: unique_student_identifier})
 
         $.ajax
           dataType: 'json'
           url: @$btn_skip_entrance_exam.data 'endpoint'
           data: send_data
-          success: @clear_errors_then -> alert full_success_message
-          error: std_ajax_err => @$request_response_error_ee.text full_error_message
+          success: @clear_errors_then ->
+            success_message = gettext("Student '{student_id}' is marked to skip entrance exam.")
+            full_success_message = interpolate_text(success_message, {student_id: unique_student_identifier})
+            alert full_success_message
+          error: std_ajax_err =>
+            error_message = gettext("Error marking student '{student_id}' to skip entrance exam.. Make sure student identifier is correct.")
+            full_error_message = interpolate_text(error_message, {student_id: unique_student_identifier})
+            @$request_response_error_ee.text full_error_message
       else
         @clear_errors()
 
