@@ -277,7 +277,7 @@ def _section_membership(course, access):
     return section_data
 
 def _section_cohort_management(course, access):
-    """ Provide data for the corresponding dashboard section """
+    """ Provide data for the corresponding cohort management section """
     course_key = course.id
     section_data = {
         'section_key': 'cohort_management',
