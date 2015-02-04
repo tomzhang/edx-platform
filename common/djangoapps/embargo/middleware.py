@@ -81,7 +81,8 @@ class EmbargoMiddleware(object):
         Processes embargo requests.
         """
         if self.enable_country_access:
-            return self.country_access_rules(request)
+            if self.country_access_rules(request):
+                return self._embargo_redirect_response
         else:
             url = request.path
             course_id = course_id_from_url(url)

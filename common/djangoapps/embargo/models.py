@@ -247,21 +247,25 @@ class CountryAccessRule(models.Model):
             True if no country found for the given course and rule type
             otherwise check given country exists in list
         """
-        blocked = True
-
+        blocked = None
         white_countries = cls._get_country_access_list(course_id, WHITE_LIST)
+        if white_countries:
+            if country in white_countries:
+                blocked = None
+            else:
+                blocked = True
+            return blocked
+
         black_countries = cls._get_country_access_list(course_id, BLACK_LIST)
-
-        if not white_countries and not black_countries:
-            blocked = None
-
-        if country in white_countries:
-            blocked = None
-
-        if country in black_countries:
-            blocked = True
+        if black_countries:
+            if country in black_countries:
+                blocked = True
+            else:
+                blocked = None
+            return blocked
 
         return blocked
+
 
     @classmethod
     def _get_country_access_list(cls, course_id, rule_type):
